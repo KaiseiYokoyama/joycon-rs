@@ -12,6 +12,7 @@ pub mod result {
     pub enum JoyConError {
         HidApiError(hidapi::HidError),
         JoyConDeviceError(JoyConDeviceError),
+        JoyConReportError(JoyConReportError),
     }
 
     impl From<hidapi::HidError> for JoyConError {
@@ -29,6 +30,17 @@ pub mod result {
     impl From<JoyConDeviceError> for JoyConError {
         fn from(e: JoyConDeviceError) -> Self {
             JoyConError::JoyConDeviceError(e)
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum JoyConReportError {
+        InvalidReport(Vec<u8>),
+    }
+
+    impl From<JoyConReportError> for JoyConError {
+        fn from(e: JoyConReportError) -> Self {
+            JoyConError::JoyConReportError(e)
         }
     }
 
