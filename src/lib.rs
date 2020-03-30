@@ -50,6 +50,7 @@ pub mod result {
         InvalidReport(Vec<u8>),
         Battery(u8),
         ConnectionInfo(u8),
+        InvalidInputReportId(u8),
     }
 
     impl From<InvalidStandardFullReport> for JoyConReportError {

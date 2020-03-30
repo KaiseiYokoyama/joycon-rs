@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub use joycon_device::JoyConDevice;
 // pub use joycon::JoyCon;
-pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode, standard_input_report};
+pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode, standard_input_report, Command, SubCommand};
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
@@ -359,6 +359,7 @@ mod driver {
     pub mod standard_input_report {
         use super::*;
         use std::convert::TryFrom;
+        use std::fmt::Error;
 
         #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
         pub enum BatteryLevel {
@@ -524,6 +525,182 @@ mod driver {
             }
         }
 
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        pub struct AxisData {
+            /// Acceleration to X measured in Gs
+            pub accel_x: f32,
+            /// Acceleration to Y measured in Gs
+            pub accel_y: f32,
+            /// Acceleration to Z measured in Gs
+            pub accel_z: f32,
+            pub gyro_1: f32,
+            pub gyro_2: f32,
+            pub gyro_3: f32,
+        }
+
+        impl From<[u8; 12]> for AxisData {
+            fn from(value: [u8; 12]) -> Self {
+                const SENSOR_RES: f32 = 65535.0;
+                fn accel(raw: [u8; 2]) -> f32 {
+                    let raw = i16::from_le_bytes([raw[0], raw[1]]);
+                    const G_RANGE: f32 = 16384.0;
+
+                    raw as f32 * G_RANGE / SENSOR_RES / 1000.0
+                }
+                let accel_x = accel([value[0], value[1]]);
+                let accel_y = accel([value[2], value[3]]);
+                let accel_z = accel([value[4], value[5]]);
+
+                fn gyro(raw: [u8; 2]) -> f32 {
+                    let raw = i16::from_le_bytes([raw[0], raw[1]]);
+                    const G_GAIN: f32 = 4588.0;
+
+                    raw as f32 * G_GAIN / SENSOR_RES
+                }
+                let gyro_1 = gyro([value[6], value[7]]);
+                let gyro_2 = gyro([value[8], value[9]]);
+                let gyro_3 = gyro([value[10], value[11]]);
+
+                AxisData {
+                    accel_x,
+                    accel_y,
+                    accel_z,
+                    gyro_1,
+                    gyro_2,
+                    gyro_3,
+                }
+            }
+        }
+
+        #[allow(non_camel_case_types)]
+        #[derive(Clone)]
+        pub enum ExtraData {
+            /// Standard input reports used for subcommand replies.
+            SubCommand {
+                ack_byte: u8,
+                sub_command_id: u8,
+                reply: [u8; 35],
+            },
+            /// NFC/IR MCU FW update input report.
+            NFC_IR {
+                report: [u8; 37]
+            },
+            /// Standard full mode - input reports with IMU data instead of subcommand replies.
+            /// Pushes current state @60Hz, or @120Hz if Pro Controller.
+            Full {
+                axis_data: [AxisData; 3],
+            },
+            /// NFC/IR MCU mode. Pushes large packets with standard input report + NFC/IR MCU data input report.
+            Full_NFC_IR {
+                axis_data: [AxisData; 3],
+                report: [u8; 313],
+            },
+        }
+
+        impl Debug for ExtraData {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f,
+                       "{}",
+                       match self {
+                           ExtraData::SubCommand {
+                               ack_byte,
+                               sub_command_id,
+                               reply
+                           } => format!("SubCommand {{ ack_byte: {}, sub_command_id: {}, reply: {:?} }}",
+                                         ack_byte,
+                                         sub_command_id,
+                                         &reply[..]),
+                           ExtraData::NFC_IR {
+                               report
+                           } => format!("NFC_IR {{ report: {:?} }}", &report[..]),
+                           ExtraData::Full {
+                               axis_data,
+                           } => format!("Full {{ axis_data: {:?} }}", &axis_data[..]),
+                           ExtraData::Full_NFC_IR {
+                               axis_data,
+                               report,
+                           } => format!("Full_NFC_IR {{ axis_data: {:?}, report: {:?} }}", axis_data, &report[..]),
+                       }
+                )
+            }
+        }
+
+        /// get extra data from packet data
+        impl TryFrom<&[u8]> for ExtraData {
+            type Error = JoyConError;
+
+            fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                let input_report_id = value.get(0)
+                    .ok_or(InvalidStandardFullReport::InvalidReport(value.to_vec()))?
+                    .clone();
+
+                let len = match input_report_id {
+                    // Sub-command reply
+                    0x21 => 50,
+                    // NFC/IR MCU FW update input report
+                    0x23 => 50,
+                    // 6-Axis data
+                    0x30 | 0x32 | 0x33 => 49,
+                    // NFC/IR MCU mode
+                    0x31 => 362,
+                    _ => Err(InvalidStandardFullReport::InvalidInputReportId(input_report_id))?,
+                };
+                if value.len() < len {
+                    Err(InvalidStandardFullReport::InvalidReport(value.to_vec()))?
+                }
+
+                match input_report_id {
+                    0x21 => {
+                        let ack_byte = value[13];
+                        let sub_command_id = value[14];
+                        let mut reply = [0x00; 35];
+                        reply.copy_from_slice(&value[15..50]);
+
+                        Ok(ExtraData::SubCommand { ack_byte, sub_command_id, reply })
+                    }
+                    0x23 => {
+                        let mut report = [0x00; 37];
+                        report.copy_from_slice(&value[13..50]);
+                        Ok(ExtraData::NFC_IR { report })
+                    }
+                    0x30 | 0x32 | 0x33 | 0x31 => {
+                        let latest = {
+                            let mut latest = [0x00; 12];
+                            latest.copy_from_slice(&value[13..25]);
+                            latest
+                        };
+                        let a_5ms_older = {
+                            let mut latest = [0x00; 12];
+                            latest.copy_from_slice(&value[25..37]);
+                            latest
+                        };
+                        let a_10ms_older = {
+                            let mut latest = [0x00; 12];
+                            latest.copy_from_slice(&value[37..49]);
+                            latest
+                        };
+
+                        let axis_data = [
+                            AxisData::from(latest),
+                            AxisData::from(a_5ms_older),
+                            AxisData::from(a_10ms_older)
+                        ];
+
+                        match input_report_id {
+                            0x31 => {
+                                let mut report = [0; 313];
+                                report.copy_from_slice(&value[49..363]);
+                                Ok(ExtraData::Full_NFC_IR { axis_data, report })
+                            }
+                            0x30 | 0x32 | 0x33 => Ok(ExtraData::Full { axis_data }),
+                            _ => unreachable!()
+                        }
+                    }
+                    _ => unreachable!()
+                }
+            }
+        }
+
         #[derive(Debug, Clone)]
         pub struct StandardInputReport {
             input_report_id: u8,
@@ -534,6 +711,7 @@ mod driver {
             left_analog_stick_data: AnalogStickData,
             right_analog_stick_data: AnalogStickData,
             vibrator_input_report: u8,
+            extra_data: ExtraData,
         }
 
         impl StandardInputReport {
@@ -588,6 +766,8 @@ mod driver {
 
                     let vibrator_input_report = report[12];
 
+                    let extra_data = ExtraData::try_from(report)?;
+
                     Ok(StandardInputReport {
                         input_report_id,
                         timer,
@@ -597,6 +777,7 @@ mod driver {
                         left_analog_stick_data,
                         right_analog_stick_data,
                         vibrator_input_report,
+                        extra_data,
                     })
                 })
             }
