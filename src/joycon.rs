@@ -533,8 +533,11 @@ mod driver {
             pub accel_y: f32,
             /// Acceleration to Z measured in Gs
             pub accel_z: f32,
+            /// Rotation of X measured in degree/s
             pub gyro_1: f32,
+            /// Rotation of Y measured in degree/s
             pub gyro_2: f32,
+            /// Rotation of Z measured in degree/s
             pub gyro_3: f32,
         }
 
