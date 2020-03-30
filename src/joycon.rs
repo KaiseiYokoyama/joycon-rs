@@ -349,7 +349,7 @@ mod driver {
         }
 
         fn increase_global_packet_number(&mut self) {
-            self.global_packet_number = self.global_packet_number + GlobalPacketNumber(1);
+            self.global_packet_number = self.global_packet_number.next();
         }
     }
 
