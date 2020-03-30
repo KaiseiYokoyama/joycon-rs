@@ -506,6 +506,24 @@ mod driver {
             }
         }
 
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct AnalogStickData {
+            horizontal: u16,
+            vertical: u16,
+        }
+
+        impl From<[u8; 3]> for AnalogStickData {
+            fn from(value: [u8; 3]) -> Self {
+                let horizontal = value[0] as u16 | ((value[1] as u16 & 0xF) << 8);
+                let vertical = (value[1] as u16 >> 4) | ((value[2] as u16) << 4);
+
+                Self {
+                    horizontal,
+                    vertical,
+                }
+            }
+        }
+
         #[derive(Debug, Clone)]
         pub struct StandardInputReport {
             input_report_id: u8,
@@ -513,6 +531,8 @@ mod driver {
             battery: Battery,
             connection_info: ConnectionInfo,
             pushed_buttons: PushedButtons,
+            left_analog_stick_data: AnalogStickData,
+            right_analog_stick_data: AnalogStickData,
         }
 
         impl StandardInputReport {
@@ -556,12 +576,23 @@ mod driver {
                         PushedButtons::from(array)
                     };
 
+                    let left_analog_stick_data = {
+                        let array = [report[6], report[7], report[8]];
+                        AnalogStickData::from(array)
+                    };
+                    let right_analog_stick_data = {
+                        let array = [report[9], report[10], report[11]];
+                        AnalogStickData::from(array)
+                    };
+
                     Ok(StandardInputReport {
                         input_report_id,
                         timer,
                         battery,
                         connection_info,
                         pushed_buttons,
+                        left_analog_stick_data,
+                        right_analog_stick_data,
                     })
                 })
             }
