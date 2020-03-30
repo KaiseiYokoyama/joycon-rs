@@ -533,6 +533,7 @@ mod driver {
             pushed_buttons: PushedButtons,
             left_analog_stick_data: AnalogStickData,
             right_analog_stick_data: AnalogStickData,
+            vibrator_input_report: u8,
         }
 
         impl StandardInputReport {
@@ -585,6 +586,8 @@ mod driver {
                         AnalogStickData::from(array)
                     };
 
+                    let vibrator_input_report = report[12];
+
                     Ok(StandardInputReport {
                         input_report_id,
                         timer,
@@ -593,6 +596,7 @@ mod driver {
                         pushed_buttons,
                         left_analog_stick_data,
                         right_analog_stick_data,
+                        vibrator_input_report,
                     })
                 })
             }
