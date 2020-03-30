@@ -35,12 +35,32 @@ pub mod result {
 
     #[derive(Debug)]
     pub enum JoyConReportError {
-        InvalidReport(Vec<u8>),
+        InvalidSimpleHIDReport(Vec<u8>),
+        InvalidStandardFullReport(InvalidStandardFullReport),
     }
 
     impl From<JoyConReportError> for JoyConError {
         fn from(e: JoyConReportError) -> Self {
             JoyConError::JoyConReportError(e)
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum InvalidStandardFullReport {
+        InvalidReport(Vec<u8>),
+        Battery(u8),
+    }
+
+    impl From<InvalidStandardFullReport> for JoyConReportError {
+        fn from(e: InvalidStandardFullReport) -> Self {
+            JoyConReportError::InvalidStandardFullReport(e)
+        }
+    }
+
+    impl From<InvalidStandardFullReport> for JoyConError {
+        fn from(e: InvalidStandardFullReport) -> Self {
+            let report_error = JoyConReportError::from(e);
+            JoyConError::from(report_error)
         }
     }
 

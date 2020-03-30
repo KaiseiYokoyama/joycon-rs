@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub use joycon_device::JoyConDevice;
 // pub use joycon::JoyCon;
-pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode};
+pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode, standard_input_report};
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
@@ -313,8 +313,10 @@ mod driver {
 
             // set sub command
             buf[10] = sub_command;
+            dbg!(buf.to_vec());
+            dbg!(&data);
             // set data
-            buf[11..].copy_from_slice(data);
+            buf[11..11+data.len()].copy_from_slice(data);
 
             self.write(&buf)
         }
@@ -353,10 +355,110 @@ mod driver {
         }
     }
 
+    pub mod standard_input_report {
+        use super::*;
+        use std::convert::TryFrom;
+
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct Battery {
+            pub level: BatteryLevel,
+            pub is_charging: bool,
+        }
+
+        impl TryFrom<u8> for Battery {
+            type Error = JoyConError;
+
+            fn try_from(value: u8) -> Result<Self, Self::Error> {
+                let is_charging = value % 2 == 1;
+                let value = if is_charging {
+                    value - 1
+                } else { value };
+                let level = match value {
+                    0 => BatteryLevel::Empty,
+                    2 => BatteryLevel::Critical,
+                    4 => BatteryLevel::Low,
+                    6 => BatteryLevel::Medium,
+                    8 => BatteryLevel::Full,
+                    _ => Err(JoyConReportError::InvalidStandardFullReport(InvalidStandardFullReport::Battery(value)))?
+                };
+
+                Ok(Battery { level, is_charging })
+            }
+        }
+
+        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum BatteryLevel {
+            Empty,
+            Critical,
+            Low,
+            Medium,
+            Full,
+        }
+
+        // #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        // pub struct ConnectionInfo {
+        //
+        // }
+
+        #[derive(Debug, Clone)]
+        pub struct StandardInputReport {
+            input_report_id: u8,
+            timer: u8,
+            battery: Battery,
+        }
+
+        impl StandardInputReport {
+            pub fn parse<P>(data: &[u8], parser: P) -> JoyConResult<StandardInputReport>
+                where P: Fn(&[u8]) -> JoyConResult<StandardInputReport> {
+                parser(data)
+            }
+        }
+
+        pub trait StandardInputReportMode: JoyConDriver {
+            fn set_standard_input_report_mode(&mut self) -> JoyConResult<usize> {
+                self.send_command(Command::RumbleAndSubCommand, SubCommand::SetInputReportMode, &[0x30])
+            }
+
+            fn read_update(&self) -> JoyConResult<StandardInputReport>;
+        }
+
+        impl StandardInputReportMode for SimpleJoyConDriver {
+            fn read_update(&self) -> JoyConResult<StandardInputReport> {
+                let mut buf = [0x00; 361];
+                self.read(&mut buf)?;
+
+                StandardInputReport::parse(&buf, |report| {
+                    let input_report_id = report.get(0)
+                        .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
+                        .clone();
+                    let timer = report.get(1)
+                        .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
+                        .clone();
+                    let (battery) = {
+                        let value = report.get(2)
+                            .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
+                            .clone();
+                        let high_nibble = value / 16;
+                        let _low_nibble = value % 16;
+
+                        (Battery::try_from(high_nibble)?)
+                    };
+
+                    Ok(StandardInputReport {
+                        input_report_id,
+                        timer,
+                        battery,
+                    })
+                })
+            }
+        }
+    }
+
     pub mod simple_hid_mode {
         use super::*;
         use crate::result::JoyConResult;
 
+        /// Pushed buttons and stick direction.
         #[derive(Debug, Clone)]
         pub struct SimpleHidUpdate {
             pub pushed_buttons: Vec<Buttons>,
@@ -476,9 +578,9 @@ mod driver {
                     };
 
                     let button_value_1 = report.get(1)
-                        .ok_or(JoyConReportError::InvalidReport(report.to_vec()))?;
+                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?;
                     let button_value_2 = report.get(2)
-                        .ok_or(JoyConReportError::InvalidReport(report.to_vec()))?;
+                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?;
 
                     let pushed_buttons = {
                         let mut pushed_buttons = Vec::new();
@@ -507,10 +609,10 @@ mod driver {
                     };
 
                     let stick_value = report.get(3)
-                        .ok_or(JoyConReportError::InvalidReport(report.to_vec()))?;
+                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?;
 
                     let stick_direction = stick_directions.get(stick_value.clone() as usize)
-                        .ok_or(JoyConReportError::InvalidReport(report.to_vec()))?
+                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?
                         .clone();
 
                     Ok(SimpleHidUpdate {
