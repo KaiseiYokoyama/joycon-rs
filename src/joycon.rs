@@ -316,7 +316,7 @@ mod driver {
             dbg!(buf.to_vec());
             dbg!(&data);
             // set data
-            buf[11..11+data.len()].copy_from_slice(data);
+            buf[11..11 + data.len()].copy_from_slice(data);
 
             self.write(&buf)
         }
@@ -359,6 +359,15 @@ mod driver {
         use super::*;
         use std::convert::TryFrom;
 
+        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum BatteryLevel {
+            Empty,
+            Critical,
+            Low,
+            Medium,
+            Full,
+        }
+
         #[derive(Debug, Clone, Hash, Eq, PartialEq)]
         pub struct Battery {
             pub level: BatteryLevel,
@@ -386,25 +395,42 @@ mod driver {
             }
         }
 
-        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
-        pub enum BatteryLevel {
-            Empty,
-            Critical,
-            Low,
-            Medium,
-            Full,
+        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+        pub enum Device {
+            JoyCon,
+            ProConOrChargingGrip,
         }
 
-        // #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-        // pub struct ConnectionInfo {
-        //
-        // }
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct ConnectionInfo {
+            device: Device,
+            is_powered: bool,
+        }
+
+        impl TryFrom<u8> for ConnectionInfo {
+            type Error = JoyConError;
+
+            fn try_from(value: u8) -> Result<Self, Self::Error> {
+                let device = match (value >> 1) & 3 {
+                    3 => Device::JoyCon,
+                    0 => Device::ProConOrChargingGrip,
+                    _ => Err(InvalidStandardFullReport::ConnectionInfo(value))?
+                };
+                let is_powered = (value & 1) == 1;
+
+                Ok(ConnectionInfo {
+                    device,
+                    is_powered,
+                })
+            }
+        }
 
         #[derive(Debug, Clone)]
         pub struct StandardInputReport {
             input_report_id: u8,
             timer: u8,
             battery: Battery,
+            connection_info: ConnectionInfo,
         }
 
         impl StandardInputReport {
@@ -434,20 +460,21 @@ mod driver {
                     let timer = report.get(1)
                         .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
                         .clone();
-                    let (battery) = {
+                    let (battery, connection_info) = {
                         let value = report.get(2)
                             .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
                             .clone();
                         let high_nibble = value / 16;
-                        let _low_nibble = value % 16;
+                        let low_nibble = value % 16;
 
-                        (Battery::try_from(high_nibble)?)
+                        (Battery::try_from(high_nibble)?, ConnectionInfo::try_from(low_nibble)?)
                     };
 
                     Ok(StandardInputReport {
                         input_report_id,
                         timer,
                         battery,
+                        connection_info
                     })
                 })
             }

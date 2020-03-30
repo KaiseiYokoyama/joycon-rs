@@ -49,6 +49,7 @@ pub mod result {
     pub enum InvalidStandardFullReport {
         InvalidReport(Vec<u8>),
         Battery(u8),
+        ConnectionInfo(u8),
     }
 
     impl From<InvalidStandardFullReport> for JoyConReportError {
