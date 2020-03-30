@@ -29,6 +29,7 @@ pub enum Buttons {
     ZL,
     SL,
     SR,
+    ChargingGrip,
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
@@ -425,12 +426,93 @@ mod driver {
             }
         }
 
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct PushedButtons {
+            right: Vec<Buttons>,
+            shared: Vec<Buttons>,
+            left: Vec<Buttons>,
+        }
+
+        impl PushedButtons {
+            const RIGHT_BUTTONS: [Buttons; 8] = [
+                Buttons::Y,
+                Buttons::X,
+                Buttons::B,
+                Buttons::A,
+                Buttons::SR,
+                Buttons::SL,
+                Buttons::R,
+                Buttons::ZR,
+            ];
+            const SHARED_BUTTONS: [Buttons; 8] = [
+                Buttons::Minus,
+                Buttons::Plus,
+                Buttons::RStick,
+                Buttons::LStick,
+                Buttons::Home,
+                Buttons::Capture,
+                // originally none
+                Buttons::Capture,
+                Buttons::ChargingGrip,
+            ];
+            const LEFT_BUTTONS: [Buttons; 8] = [
+                Buttons::Down,
+                Buttons::Up,
+                Buttons::Right,
+                Buttons::Left,
+                Buttons::SR,
+                Buttons::SL,
+                Buttons::L,
+                Buttons::ZL,
+            ];
+        }
+
+        impl From<[u8; 3]> for PushedButtons {
+            fn from(value: [u8; 3]) -> Self {
+                let right_val = value[0];
+                let shared_val = value[1];
+                let left_val = value[2];
+
+                let right = PushedButtons::RIGHT_BUTTONS.iter()
+                    .enumerate()
+                    .filter(|(idx, _)| {
+                        let idx = 2u8.pow(*idx as u32) as u8;
+                        right_val & idx == idx
+                    })
+                    .map(|(_, b)| b.clone())
+                    .collect();
+                let shared = PushedButtons::SHARED_BUTTONS.iter()
+                    .enumerate()
+                    .filter(|(idx, _)| {
+                        let idx = 2u8.pow(*idx as u32) as u8;
+                        shared_val & idx == idx
+                    })
+                    .map(|(_, b)| b.clone())
+                    .collect();
+                let left = PushedButtons::LEFT_BUTTONS.iter()
+                    .enumerate()
+                    .filter(|(idx, _)| {
+                        let idx = 2u8.pow(*idx as u32) as u8;
+                        left_val & idx == idx
+                    })
+                    .map(|(_, b)| b.clone())
+                    .collect();
+
+                PushedButtons {
+                    right,
+                    shared,
+                    left,
+                }
+            }
+        }
+
         #[derive(Debug, Clone)]
         pub struct StandardInputReport {
             input_report_id: u8,
             timer: u8,
             battery: Battery,
             connection_info: ConnectionInfo,
+            pushed_buttons: PushedButtons,
         }
 
         impl StandardInputReport {
@@ -454,27 +536,32 @@ mod driver {
                 self.read(&mut buf)?;
 
                 StandardInputReport::parse(&buf, |report| {
-                    let input_report_id = report.get(0)
-                        .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
-                        .clone();
-                    let timer = report.get(1)
-                        .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
-                        .clone();
+                    if report.len() < 13 {
+                        Err(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
+                    }
+
+                    let input_report_id = report[0];
+                    let timer = report[1];
+
                     let (battery, connection_info) = {
-                        let value = report.get(2)
-                            .ok_or(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
-                            .clone();
+                        let value = report[2];
                         let high_nibble = value / 16;
                         let low_nibble = value % 16;
 
                         (Battery::try_from(high_nibble)?, ConnectionInfo::try_from(low_nibble)?)
                     };
 
+                    let pushed_buttons = {
+                        let array = [report[3], report[4], report[5]];
+                        PushedButtons::from(array)
+                    };
+
                     Ok(StandardInputReport {
                         input_report_id,
                         timer,
                         battery,
-                        connection_info
+                        connection_info,
+                        pushed_buttons,
                     })
                 })
             }
@@ -615,7 +702,7 @@ mod driver {
                         let mut pushed_buttons_1 = buttons_1.iter()
                             .enumerate()
                             .filter(|(i, _)| {
-                                let idx = 2u8.pow(i.clone() as u32) as u8;
+                                let idx = 2u8.pow(*i as u32) as u8;
                                 button_value_1 & idx == idx
                             })
                             .map(|(_, b)| b.clone())
@@ -625,7 +712,7 @@ mod driver {
                         let mut pushed_buttons_2 = buttons_2.iter()
                             .enumerate()
                             .filter(|(i, _)| {
-                                let idx = 2u8.pow(i.clone() as u32) as u8;
+                                let idx = 2u8.pow(*i as u32) as u8;
                                 button_value_2 & idx == idx
                             })
                             .map(|(_, b)| b.clone())
