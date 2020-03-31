@@ -116,6 +116,8 @@ mod joycon_device {
 mod driver {
     use super::*;
     pub use global_packet_number::GlobalPacketNumber;
+    pub use joycon_features::{JoyConFeatures, IMUFeature, Vibration};
+    use std::collections::HashSet;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Rotation {
@@ -172,6 +174,102 @@ mod driver {
         Landscape,
     }
 
+    /// Features on Joy-Cons which needs to set up.
+    /// ex. IMU(6-Axis sensor), NFC/IR, LED, Vibration
+    pub mod joycon_features {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum JoyConFeatures {
+            IMUFeature(IMUFeature),
+            Vibration
+        }
+
+        pub use imu_sensitivity::IMUFeature;
+
+        pub mod imu_sensitivity {
+            /// Gyroscope sensitivity
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            pub enum GyroscopeSensitivity {
+                PM250dps = 0x00,
+                PM500dps = 0x01,
+                PM1000dps = 0x02,
+                PM2000dps = 0x03,
+            }
+
+            impl Default for GyroscopeSensitivity {
+                fn default() -> Self {
+                    GyroscopeSensitivity::PM2000dps
+                }
+            }
+
+            /// Accelerometer sensitivity
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            pub enum AccelerometerSensitivity {
+                PM8G = 0x00,
+                PM4G = 0x01,
+                PM2G = 0x02,
+                PM16G = 0x03,
+            }
+
+            impl Default for AccelerometerSensitivity {
+                fn default() -> Self {
+                    AccelerometerSensitivity::PM8G
+                }
+            }
+
+            /// Gyroscope performance rate
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            pub enum GyroscopePerformanceRate {
+                F833Hz = 0x00,
+                F208Hz = 0x01,
+            }
+
+            impl Default for GyroscopePerformanceRate {
+                fn default() -> Self {
+                    GyroscopePerformanceRate::F208Hz
+                }
+            }
+
+            /// Accelerometer Anti-aliasing filter bandwidth
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            pub enum AccelerometerAntiAliasingFilterBandwidth {
+                F200Hz = 0x00,
+                F100Hz = 0x01,
+            }
+
+            impl Default for AccelerometerAntiAliasingFilterBandwidth {
+                fn default() -> Self {
+                    AccelerometerAntiAliasingFilterBandwidth::F100Hz
+                }
+            }
+
+            #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+            pub struct IMUFeature {
+                pub gyroscope_sensitivity: GyroscopeSensitivity,
+                pub accelerometer_sensitivity: AccelerometerSensitivity,
+                pub gyroscope_performance_rate: GyroscopePerformanceRate,
+                pub accelerometer_anti_aliasing_filter_bandwidth: AccelerometerAntiAliasingFilterBandwidth,
+            }
+
+            impl Into<[u8;4]> for IMUFeature {
+                fn into(self) -> [u8; 4] {
+                    let IMUFeature {
+                        gyroscope_sensitivity,
+                        accelerometer_sensitivity,
+                        gyroscope_performance_rate,
+                        accelerometer_anti_aliasing_filter_bandwidth,
+                    } = self;
+
+                    [
+                        gyroscope_sensitivity as u8,
+                        accelerometer_sensitivity as u8,
+                        gyroscope_performance_rate as u8,
+                        accelerometer_anti_aliasing_filter_bandwidth as u8
+                    ]
+                }
+            }
+        }
+    }
+
     mod global_packet_number {
         use std::ops::Add;
 
@@ -217,17 +315,23 @@ mod driver {
         pub joycon: JoyConDevice,
         /// rotation of controller
         pub rotation: Rotation,
+        enabled_features: HashSet<JoyConFeatures>,
         /// Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
         global_packet_number: GlobalPacketNumber,
     }
 
     impl SimpleJoyConDriver {
         pub fn new(joycon: JoyConDevice) -> Self {
-            Self {
+            let mut driver = Self {
                 joycon,
                 rotation: Rotation::Portrait,
+                enabled_features: HashSet::new(),
                 global_packet_number: GlobalPacketNumber::default(),
-            }
+            };
+
+            driver.reset();
+
+            driver
         }
     }
 
@@ -273,6 +377,20 @@ mod driver {
         fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
             self.send_command(Command::RumbleAndSubCommand, sub_command, data)
         }
+
+        /// disable Joy-Con's features
+        fn reset(&mut self) -> JoyConResult<()> {
+            // disable IMU (6-Axis sensor)
+            self.send_sub_command(SubCommand::EnableIMU, &[0x00])?;
+            // disable vibration
+            self.send_sub_command(SubCommand::EnableVibration, &[0x00])?;
+
+            Ok(())
+        }
+
+        fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()>;
+
+        fn enabled_features(&self) -> &HashSet<JoyConFeatures>;
     }
 
     impl JoyConDriver for SimpleJoyConDriver {
@@ -291,7 +409,21 @@ mod driver {
         fn increase_global_packet_number(&mut self) {
             self.global_packet_number = self.global_packet_number.next();
         }
-    }
+
+        fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()> {
+            match feature {
+                JoyConFeatures::IMUFeature(feature) => {
+                    let data = feature.into();
+                    // enable IMU
+                    self.send_sub_command(SubCommand::EnableIMU, &[0x01])?;
+                    // set config
+                    self.send_sub_command(SubCommand::SetIMUSensitivity, &data)?;
+                }
+                JoyConFeatures::Vibration => {
+                    // enable vibration
+                    self.send_sub_command(SubCommand::EnableVibration, &[0x01])?;
+                }
+            }
 
     pub mod standard_input_report {
         use super::*;
