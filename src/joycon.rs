@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub use joycon_device::JoyConDevice;
 // pub use joycon::JoyCon;
-pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode, standard_input_report, Command, SubCommand};
+pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode, Command, SubCommand};
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
@@ -413,7 +413,7 @@ mod driver {
         fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()> {
             match feature {
                 JoyConFeatures::IMUFeature(feature) => {
-                    let data = feature.into();
+                    let data: [u8; 4] = feature.into();
                     // enable IMU
                     self.send_sub_command(SubCommand::EnableIMU, &[0x01])?;
                     // set config
@@ -670,8 +670,10 @@ mod driver {
                 vibrator_input_report: u8,
             }
 
-            impl From<[u8; 13]> for CommonReport {
-                fn from(report: [u8; 13]) -> Self {
+            impl TryFrom<[u8; 13]> for CommonReport {
+                type Error = JoyConError;
+
+                fn try_from(report: [u8; 13]) -> JoyConResult<CommonReport> {
                     let input_report_id = report[0];
                     let timer = report[1];
 
@@ -699,7 +701,7 @@ mod driver {
 
                     let vibrator_input_report = report[12];
 
-                    CommonReport {
+                    Ok(CommonReport {
                         input_report_id,
                         timer,
                         battery,
@@ -708,14 +710,14 @@ mod driver {
                         left_analog_stick_data,
                         right_analog_stick_data,
                         vibrator_input_report,
-                    }
+                    })
                 }
             }
         }
 
-        pub trait InputReportMode<D: JoyConDriver>: Deref<Target = D> + DerefMut<Target = D> {
-            type Mode: InputReportMode;
-            type Report: TryFrom<&[u8], Error = JoyConError>;
+        pub trait InputReportMode<D: JoyConDriver>: Deref<Target=D> + DerefMut<Target=D> {
+            type Mode: InputReportMode<D>;
+            type Report: TryFrom<[u8; 362], Error=JoyConError>;
 
             /// set Joy-Con's input report mode and return instance
             fn set(driver: D) -> JoyConResult<Self::Mode>;
@@ -723,52 +725,45 @@ mod driver {
             /// read Joy-Con's input report
             fn read_input_report(&self) -> JoyConResult<Self::Report> {
                 // read
-                let mut buf = [0x00;362];
+                let mut buf = [0x00; 362];
                 self.read(&mut buf)?;
                 // convert
-                Self::Report::try_from(&buf)
+                Self::Report::try_from(buf)
             }
         }
 
-        pub struct ExtraReport<'a>(&'a [u8]);
-
-        pub struct StandardInputReport<EX: TryFrom<ExtraReport, Error = JoyConError>> {
+        pub struct StandardInputReport<EX: TryFrom<[u8;349], Error = JoyConError>> {
             common: CommonReport,
             extra: EX,
         }
 
-        impl<EX: TryFrom<ExtraReport, Error = JoyConError>> TryFrom<&[u8]> for StandardInputReport<EX> {
+        impl<EX: TryFrom<[u8; 349], Error=JoyConError>> TryFrom<[u8; 362]> for StandardInputReport<EX> {
             type Error = JoyConError;
 
-            fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                // check length
-                if value.len() < 13 {
-                    Err(InvalidStandardInputReport::InvalidReport(value.to_vec()))?
-                }
-
+            fn try_from(value: [u8; 362]) -> Result<Self, Self::Error> {
                 // common report
                 let common = {
-                    let mut value = [0x00; 13];
-                    value.copy_from_slice(&value[0..13]);
-                    CommonReport::try_from(value)?
+                    let mut data = [0x00; 13];
+                    data.copy_from_slice(&value[0..13]);
+                    CommonReport::try_from(data)?
                 };
 
                 // extra report
                 let extra = {
-                    let ex_report = ExtraReport(&value[13..]);
-                    EX::try_from(ex_report)?
+                    let mut data = [0x00; 349];
+                    data.copy_from_slice(&value[13..362]);
+                    EX::try_from(data)?
                 };
 
                 Ok(StandardInputReport {
                     common,
-                    extra
+                    extra,
                 })
             }
         }
 
         mod sub_command_mode {
             use super::*;
-            use std::convert::TryFrom;
 
             /// Joy-Con emitting standard input report with sub-command reply
             pub struct SubCommandMode<D: JoyConDriver> {
@@ -782,15 +777,10 @@ mod driver {
                 reply: [u8; 35],
             }
 
-            impl TryFrom<ExtraReport> for SubCommandReply {
+            impl TryFrom<[u8;349]> for SubCommandReply {
                 type Error = JoyConError;
 
-                fn try_from(value: ExtraReport) -> Result<Self, Self::Error> {
-                    let value = value.0;
-                    // check length
-                    if value.len() < 37 {
-                        Err(InvalidStandardInputReport::InvalidExtraReport(value.to_vec()))?
-                    }
+                fn try_from(value: [u8;349]) -> Result<Self, Self::Error> {
                     let ack_byte = value[0];
                     let sub_command_id = value[1];
                     let mut reply = [0x00; 35];
@@ -821,7 +811,7 @@ mod driver {
                 }
             }
 
-            impl<D> Deref for SubCommandMode<D> {
+            impl<D: JoyConDriver> Deref for SubCommandMode<D> {
                 type Target = D;
 
                 fn deref(&self) -> &Self::Target {
@@ -829,223 +819,84 @@ mod driver {
                 }
             }
 
-            impl<D> DerefMut for SubCommandMode<D> {
+            impl<D: JoyConDriver> DerefMut for SubCommandMode<D> {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.driver
                 }
             }
         }
 
-        mod 
-    }
-        #[allow(non_camel_case_types)]
-        #[derive(Clone)]
-        pub enum ExtraData {
-            /// Standard input reports used for subcommand replies.
-            SubCommand {
-                ack_byte: u8,
-                sub_command_id: u8,
-                reply: [u8; 35],
-            },
-            /// NFC/IR MCU FW update input report.
-            NFC_IR {
-                report: [u8; 37]
-            },
-            /// Standard full mode - input reports with IMU data instead of subcommand replies.
-            /// Pushes current state @60Hz, or @120Hz if Pro Controller.
-            Full {
-                axis_data: [AxisData; 3],
-            },
-            /// NFC/IR MCU mode. Pushes large packets with standard input report + NFC/IR MCU data input report.
-            Full_NFC_IR {
-                axis_data: [AxisData; 3],
-                report: [u8; 313],
-            },
-        }
+        mod standard_full_mode {
+            use super::*;
 
-        impl Debug for ExtraData {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                write!(f,
-                       "{}",
-                       match self {
-                           ExtraData::SubCommand {
-                               ack_byte,
-                               sub_command_id,
-                               reply
-                           } => format!("SubCommand {{ ack_byte: {}, sub_command_id: {}, reply: {:?} }}",
-                                         ack_byte,
-                                         sub_command_id,
-                                         &reply[..]),
-                           ExtraData::NFC_IR {
-                               report
-                           } => format!("NFC_IR {{ report: {:?} }}", &report[..]),
-                           ExtraData::Full {
-                               axis_data,
-                           } => format!("Full {{ axis_data: {:?} }}", &axis_data[..]),
-                           ExtraData::Full_NFC_IR {
-                               axis_data,
-                               report,
-                           } => format!("Full_NFC_IR {{ axis_data: {:?}, report: {:?} }}", axis_data, &report[..]),
-                       }
-                )
-            }
-        }
-
-        /// get extra data from packet data
-        impl TryFrom<&[u8]> for ExtraData {
-            type Error = JoyConError;
-
-            fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                let input_report_id = value.get(0)
-                    .ok_or(InvalidStandardFullReport::InvalidReport(value.to_vec()))?
-                    .clone();
-
-                let len = match input_report_id {
-                    // Sub-command reply
-                    0x21 => 50,
-                    // NFC/IR MCU FW update input report
-                    0x23 => 50,
-                    // 6-Axis data
-                    0x30 | 0x32 | 0x33 => 49,
-                    // NFC/IR MCU mode
-                    0x31 => 362,
-                    _ => Err(InvalidStandardFullReport::InvalidInputReportId(input_report_id))?,
-                };
-                if value.len() < len {
-                    Err(InvalidStandardFullReport::InvalidReport(value.to_vec()))?
-                }
-
-                match input_report_id {
-                    0x21 => {
-                        let ack_byte = value[13];
-                        let sub_command_id = value[14];
-                        let mut reply = [0x00; 35];
-                        reply.copy_from_slice(&value[15..50]);
-
-                        Ok(ExtraData::SubCommand { ack_byte, sub_command_id, reply })
-                    }
-                    0x23 => {
-                        let mut report = [0x00; 37];
-                        report.copy_from_slice(&value[13..50]);
-                        Ok(ExtraData::NFC_IR { report })
-                    }
-                    0x30 | 0x32 | 0x33 | 0x31 => {
-                        let latest = {
-                            let mut latest = [0x00; 12];
-                            latest.copy_from_slice(&value[13..25]);
-                            latest
-                        };
-                        let a_5ms_older = {
-                            let mut latest = [0x00; 12];
-                            latest.copy_from_slice(&value[25..37]);
-                            latest
-                        };
-                        let a_10ms_older = {
-                            let mut latest = [0x00; 12];
-                            latest.copy_from_slice(&value[37..49]);
-                            latest
-                        };
-
-                        let axis_data = [
-                            AxisData::from(latest),
-                            AxisData::from(a_5ms_older),
-                            AxisData::from(a_10ms_older)
-                        ];
-
-                        match input_report_id {
-                            0x31 => {
-                                let mut report = [0; 313];
-                                report.copy_from_slice(&value[49..363]);
-                                Ok(ExtraData::Full_NFC_IR { axis_data, report })
-                            }
-                            0x30 | 0x32 | 0x33 => Ok(ExtraData::Full { axis_data }),
-                            _ => unreachable!()
-                        }
-                    }
-                    _ => unreachable!()
-                }
-            }
-        }
-
-        #[derive(Debug, Clone)]
-        pub struct StandardInputReport {
-            input_report_id: u8,
-            timer: u8,
-            battery: Battery,
-            connection_info: ConnectionInfo,
-            pushed_buttons: PushedButtons,
-            left_analog_stick_data: AnalogStickData,
-            right_analog_stick_data: AnalogStickData,
-            vibrator_input_report: u8,
-            extra_data: ExtraData,
-        }
-
-        impl StandardInputReport {
-            pub fn parse<P>(data: &[u8], parser: P) -> JoyConResult<StandardInputReport>
-                where P: Fn(&[u8]) -> JoyConResult<StandardInputReport> {
-                parser(data)
-            }
-        }
-
-        pub trait StandardInputReportMode: JoyConDriver {
-            fn set_standard_input_report_mode(&mut self) -> JoyConResult<usize> {
-                self.send_command(Command::RumbleAndSubCommand, SubCommand::SetInputReportMode, &[0x30])
+            /// 6-Axis data. 3 frames of 2 groups of 3 Int16LE each. Group is Acc followed by Gyro.
+            #[derive(Clone)]
+            pub struct IMUData {
+                data: [AxisData; 3]
             }
 
-            fn read_update(&self) -> JoyConResult<StandardInputReport>;
-        }
+            impl TryFrom<[u8;349]> for IMUData {
+                type Error = JoyConError;
 
-        impl StandardInputReportMode for SimpleJoyConDriver {
-            fn read_update(&self) -> JoyConResult<StandardInputReport> {
-                let mut buf = [0x00; 361];
-                self.read(&mut buf)?;
-
-                StandardInputReport::parse(&buf, |report| {
-                    if report.len() < 13 {
-                        Err(InvalidStandardFullReport::InvalidReport(report.to_vec()))?
-                    }
-
-                    let input_report_id = report[0];
-                    let timer = report[1];
-
-                    let (battery, connection_info) = {
-                        let value = report[2];
-                        let high_nibble = value / 16;
-                        let low_nibble = value % 16;
-
-                        (Battery::try_from(high_nibble)?, ConnectionInfo::try_from(low_nibble)?)
+                fn try_from(value: [u8;349]) -> Result<Self, Self::Error> {
+                    let latest = {
+                        let mut latest = [0x00; 12];
+                        latest.copy_from_slice(&value[0..12]);
+                        latest
+                    };
+                    let a_5ms_older = {
+                        let mut latest = [0x00; 12];
+                        latest.copy_from_slice(&value[12..24]);
+                        latest
+                    };
+                    let a_10ms_older = {
+                        let mut latest = [0x00; 12];
+                        latest.copy_from_slice(&value[24..36]);
+                        latest
                     };
 
-                    let pushed_buttons = {
-                        let array = [report[3], report[4], report[5]];
-                        PushedButtons::from(array)
-                    };
+                    let axis_data = [
+                        AxisData::from(latest),
+                        AxisData::from(a_5ms_older),
+                        AxisData::from(a_10ms_older)
+                    ];
 
-                    let left_analog_stick_data = {
-                        let array = [report[6], report[7], report[8]];
-                        AnalogStickData::from(array)
-                    };
-                    let right_analog_stick_data = {
-                        let array = [report[9], report[10], report[11]];
-                        AnalogStickData::from(array)
-                    };
-
-                    let vibrator_input_report = report[12];
-
-                    let extra_data = ExtraData::try_from(report)?;
-
-                    Ok(StandardInputReport {
-                        input_report_id,
-                        timer,
-                        battery,
-                        connection_info,
-                        pushed_buttons,
-                        left_analog_stick_data,
-                        right_analog_stick_data,
-                        vibrator_input_report,
-                        extra_data,
+                    Ok(IMUData {
+                        data: axis_data,
                     })
-                })
+                }
+            }
+
+            /// Joy-Con emitting standard full report includes IMU(6-Axis sensor)
+            pub struct StandardFullMode<D: JoyConDriver> {
+                driver: D,
+            }
+
+            impl<D: JoyConDriver> Deref for StandardFullMode<D> {
+                type Target = D;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.driver
+                }
+            }
+
+            impl<D: JoyConDriver> DerefMut for StandardFullMode<D> {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.driver
+                }
+            }
+
+            impl<D: JoyConDriver> InputReportMode<D> for StandardFullMode<D> {
+                type Mode = StandardFullMode<D>;
+                type Report = StandardInputReport<IMUData>;
+
+                fn set(driver: D) -> JoyConResult<Self::Mode> {
+                    let mut driver = driver;
+                    // set input report mode to standard full mode
+                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x30])?;
+
+                    Ok(StandardFullMode { driver })
+                }
             }
         }
     }
