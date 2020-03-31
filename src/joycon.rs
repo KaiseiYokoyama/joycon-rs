@@ -113,69 +113,6 @@ mod joycon_device {
     }
 }
 
-// mod joycon {
-//     use super::*;
-//
-//     /// The controller user uses to play with.
-//     #[derive(Clone)]
-//     pub enum JoyCon {
-//         JoyConR(Arc<HidDevice>),
-//         JoyConL(Arc<HidDevice>),
-//         JoyConLR {
-//             joycon_l: Arc<HidDevice>,
-//             joycon_r: Arc<HidDevice>,
-//         },
-//         // note: I'll do it later.
-//         // Procon(Arc<HidDevice>)
-//         //     procon: Arc<HidDevice>,
-//         // }
-//     }
-//
-//     impl From<JoyConDevice> for JoyCon {
-//         fn from(jd: JoyConDevice) -> Self {
-//             match jd {
-//                 JoyConDevice::JoyConR(r) => JoyCon::JoyConR(r),
-//                 JoyConDevice::JoyConL(l) => JoyCon::JoyConL(l),
-//             }
-//         }
-//     }
-//
-//     impl Debug for JoyCon {
-//         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//             write!(f,
-//                    "{}({:?})",
-//                    match self {
-//                        JoyCon::JoyConR { .. } => "JoyConR",
-//                        JoyCon::JoyConL { .. } => "JoyConL",
-//                        JoyCon::JoyConLR { .. } => "JoyConLR",
-//                    },
-//                    match self {
-//                        JoyCon::JoyConL(joycon) => vec![DebugHidDevice(joycon)],
-//                        JoyCon::JoyConR(joycon) => vec![DebugHidDevice(joycon)],
-//                        JoyCon::JoyConLR { joycon_l, joycon_r, .. } =>
-//                            vec![DebugHidDevice(joycon_l), DebugHidDevice(joycon_r)]
-//                    })
-//         }
-//     }
-//
-//     impl JoyCon {
-//         pub fn write(&self, data: &[u8]) -> JoyConResult<usize> {
-//             let u =
-//                 match self {
-//                     JoyCon::JoyConR(hd) => hd.write(data)?,
-//                     JoyCon::JoyConL(hd) => hd.write(data)?,
-//                     // note: need reconsideration
-//                     JoyCon::JoyConLR { joycon_l, joycon_r } => {
-//                         joycon_l.write(data)?;
-//                         joycon_r.write(data)?
-//                     }
-//                 };
-//
-//             Ok(u)
-//         }
-//     }
-// }
-
 mod driver {
     use super::*;
     pub use global_packet_number::GlobalPacketNumber;
