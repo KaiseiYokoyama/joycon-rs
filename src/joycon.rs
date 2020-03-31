@@ -611,42 +611,29 @@ mod driver {
 
             #[derive(Debug, Clone, Copy, PartialEq)]
             pub struct AxisData {
-                /// Acceleration to X measured in Gs
-                pub accel_x: f32,
-                /// Acceleration to Y measured in Gs
-                pub accel_y: f32,
-                /// Acceleration to Z measured in Gs
-                pub accel_z: f32,
-                /// Rotation of X measured in degree/s
-                pub gyro_1: f32,
-                /// Rotation of Y measured in degree/s
-                pub gyro_2: f32,
-                /// Rotation of Z measured in degree/s
-                pub gyro_3: f32,
+                /// Acceleration to X measured
+                pub accel_x: i16,
+                /// Acceleration to Y measured
+                pub accel_y: i16,
+                /// Acceleration to Z measured
+                pub accel_z: i16,
+                /// Rotation of X measured
+                pub gyro_1: i16,
+                /// Rotation of Y measured
+                pub gyro_2: i16,
+                /// Rotation of Z measured
+                pub gyro_3: i16,
             }
 
             impl From<[u8; 12]> for AxisData {
                 fn from(value: [u8; 12]) -> Self {
-                    const SENSOR_RES: f32 = 65535.0;
-                    fn accel(raw: [u8; 2]) -> f32 {
-                        let raw = i16::from_le_bytes([raw[0], raw[1]]);
-                        const G_RANGE: f32 = 16384.0;
+                    let accel_x = i16::from_le_bytes([value[0], value[1]]);
+                    let accel_y = i16::from_le_bytes([value[2], value[3]]);
+                    let accel_z = i16::from_le_bytes([value[4], value[5]]);
 
-                        raw as f32 * G_RANGE / SENSOR_RES / 1000.0
-                    }
-                    let accel_x = accel([value[0], value[1]]);
-                    let accel_y = accel([value[2], value[3]]);
-                    let accel_z = accel([value[4], value[5]]);
-
-                    fn gyro(raw: [u8; 2]) -> f32 {
-                        let raw = i16::from_le_bytes([raw[0], raw[1]]);
-                        const G_GAIN: f32 = 4588.0;
-
-                        raw as f32 * G_GAIN / SENSOR_RES
-                    }
-                    let gyro_1 = gyro([value[6], value[7]]);
-                    let gyro_2 = gyro([value[8], value[9]]);
-                    let gyro_3 = gyro([value[10], value[11]]);
+                    let gyro_1 = i16::from_le_bytes([value[6], value[7]]);
+                    let gyro_2 = i16::from_le_bytes([value[8], value[9]]);
+                    let gyro_3 = i16::from_le_bytes([value[10], value[11]]);
 
                     AxisData {
                         accel_x,
