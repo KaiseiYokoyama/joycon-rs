@@ -116,7 +116,7 @@ mod joycon_device {
 mod driver {
     use super::*;
     pub use global_packet_number::GlobalPacketNumber;
-    pub use joycon_features::{JoyConFeatures, IMUFeature, Vibration};
+    pub use joycon_features::{JoyConFeatures, IMUFeature};
     use std::collections::HashSet;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -180,7 +180,7 @@ mod driver {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum JoyConFeatures {
             IMUFeature(IMUFeature),
-            Vibration
+            Vibration,
         }
 
         pub use imu_sensitivity::IMUFeature;
@@ -250,7 +250,7 @@ mod driver {
                 pub accelerometer_anti_aliasing_filter_bandwidth: AccelerometerAntiAliasingFilterBandwidth,
             }
 
-            impl Into<[u8;4]> for IMUFeature {
+            impl Into<[u8; 4]> for IMUFeature {
                 fn into(self) -> [u8; 4] {
                     let IMUFeature {
                         gyroscope_sensitivity,
@@ -425,225 +425,419 @@ mod driver {
                 }
             }
 
-    pub mod standard_input_report {
+            self.enabled_features.insert(feature);
+
+            Ok(())
+        }
+
+        fn enabled_features(&self) -> &HashSet<JoyConFeatures> {
+            &self.enabled_features
+        }
+    }
+
+    mod input_report_mode {
         use super::*;
+        pub use common::*;
         use std::convert::TryFrom;
-        use std::fmt::Error;
+        use std::ops::{Deref, DerefMut};
 
-        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
-        pub enum BatteryLevel {
-            Empty,
-            Critical,
-            Low,
-            Medium,
-            Full,
-        }
+        mod common {
+            use super::*;
+            use std::convert::TryFrom;
 
-        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-        pub struct Battery {
-            pub level: BatteryLevel,
-            pub is_charging: bool,
-        }
+            #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum BatteryLevel {
+                Empty,
+                Critical,
+                Low,
+                Medium,
+                Full,
+            }
 
-        impl TryFrom<u8> for Battery {
-            type Error = JoyConError;
+            #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            pub struct Battery {
+                pub level: BatteryLevel,
+                pub is_charging: bool,
+            }
 
-            fn try_from(value: u8) -> Result<Self, Self::Error> {
-                let is_charging = value % 2 == 1;
-                let value = if is_charging {
-                    value - 1
-                } else { value };
-                let level = match value {
-                    0 => BatteryLevel::Empty,
-                    2 => BatteryLevel::Critical,
-                    4 => BatteryLevel::Low,
-                    6 => BatteryLevel::Medium,
-                    8 => BatteryLevel::Full,
-                    _ => Err(JoyConReportError::InvalidStandardFullReport(InvalidStandardFullReport::Battery(value)))?
-                };
+            impl TryFrom<u8> for Battery {
+                type Error = JoyConError;
 
-                Ok(Battery { level, is_charging })
+                fn try_from(value: u8) -> Result<Self, Self::Error> {
+                    let is_charging = value % 2 == 1;
+                    let value = if is_charging {
+                        value - 1
+                    } else { value };
+                    let level = match value {
+                        0 => BatteryLevel::Empty,
+                        2 => BatteryLevel::Critical,
+                        4 => BatteryLevel::Low,
+                        6 => BatteryLevel::Medium,
+                        8 => BatteryLevel::Full,
+                        _ => Err(JoyConReportError::InvalidStandardFullReport(InvalidStandardInputReport::Battery(value)))?
+                    };
+
+                    Ok(Battery { level, is_charging })
+                }
+            }
+
+            #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+            pub enum Device {
+                JoyCon,
+                ProConOrChargingGrip,
+            }
+
+            #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            pub struct ConnectionInfo {
+                device: Device,
+                is_powered: bool,
+            }
+
+            impl TryFrom<u8> for ConnectionInfo {
+                type Error = JoyConError;
+
+                fn try_from(value: u8) -> Result<Self, Self::Error> {
+                    let device = match (value >> 1) & 3 {
+                        3 => Device::JoyCon,
+                        0 => Device::ProConOrChargingGrip,
+                        _ => Err(InvalidStandardInputReport::ConnectionInfo(value))?
+                    };
+                    let is_powered = (value & 1) == 1;
+
+                    Ok(ConnectionInfo {
+                        device,
+                        is_powered,
+                    })
+                }
+            }
+
+            #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            pub struct PushedButtons {
+                right: Vec<Buttons>,
+                shared: Vec<Buttons>,
+                left: Vec<Buttons>,
+            }
+
+            impl PushedButtons {
+                const RIGHT_BUTTONS: [Buttons; 8] = [
+                    Buttons::Y,
+                    Buttons::X,
+                    Buttons::B,
+                    Buttons::A,
+                    Buttons::SR,
+                    Buttons::SL,
+                    Buttons::R,
+                    Buttons::ZR,
+                ];
+                const SHARED_BUTTONS: [Buttons; 8] = [
+                    Buttons::Minus,
+                    Buttons::Plus,
+                    Buttons::RStick,
+                    Buttons::LStick,
+                    Buttons::Home,
+                    Buttons::Capture,
+                    // originally none
+                    Buttons::Capture,
+                    Buttons::ChargingGrip,
+                ];
+                const LEFT_BUTTONS: [Buttons; 8] = [
+                    Buttons::Down,
+                    Buttons::Up,
+                    Buttons::Right,
+                    Buttons::Left,
+                    Buttons::SR,
+                    Buttons::SL,
+                    Buttons::L,
+                    Buttons::ZL,
+                ];
+            }
+
+            impl From<[u8; 3]> for PushedButtons {
+                fn from(value: [u8; 3]) -> Self {
+                    let right_val = value[0];
+                    let shared_val = value[1];
+                    let left_val = value[2];
+
+                    let right = PushedButtons::RIGHT_BUTTONS.iter()
+                        .enumerate()
+                        .filter(|(idx, _)| {
+                            let idx = 2u8.pow(*idx as u32) as u8;
+                            right_val & idx == idx
+                        })
+                        .map(|(_, b)| b.clone())
+                        .collect();
+                    let shared = PushedButtons::SHARED_BUTTONS.iter()
+                        .enumerate()
+                        .filter(|(idx, _)| {
+                            let idx = 2u8.pow(*idx as u32) as u8;
+                            shared_val & idx == idx
+                        })
+                        .map(|(_, b)| b.clone())
+                        .collect();
+                    let left = PushedButtons::LEFT_BUTTONS.iter()
+                        .enumerate()
+                        .filter(|(idx, _)| {
+                            let idx = 2u8.pow(*idx as u32) as u8;
+                            left_val & idx == idx
+                        })
+                        .map(|(_, b)| b.clone())
+                        .collect();
+
+                    PushedButtons {
+                        right,
+                        shared,
+                        left,
+                    }
+                }
+            }
+
+            #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            pub struct AnalogStickData {
+                horizontal: u16,
+                vertical: u16,
+            }
+
+            impl From<[u8; 3]> for AnalogStickData {
+                fn from(value: [u8; 3]) -> Self {
+                    let horizontal = value[0] as u16 | ((value[1] as u16 & 0xF) << 8);
+                    let vertical = (value[1] as u16 >> 4) | ((value[2] as u16) << 4);
+
+                    Self {
+                        horizontal,
+                        vertical,
+                    }
+                }
+            }
+
+            #[derive(Debug, Clone, Copy, PartialEq)]
+            pub struct AxisData {
+                /// Acceleration to X measured in Gs
+                pub accel_x: f32,
+                /// Acceleration to Y measured in Gs
+                pub accel_y: f32,
+                /// Acceleration to Z measured in Gs
+                pub accel_z: f32,
+                /// Rotation of X measured in degree/s
+                pub gyro_1: f32,
+                /// Rotation of Y measured in degree/s
+                pub gyro_2: f32,
+                /// Rotation of Z measured in degree/s
+                pub gyro_3: f32,
+            }
+
+            impl From<[u8; 12]> for AxisData {
+                fn from(value: [u8; 12]) -> Self {
+                    const SENSOR_RES: f32 = 65535.0;
+                    fn accel(raw: [u8; 2]) -> f32 {
+                        let raw = i16::from_le_bytes([raw[0], raw[1]]);
+                        const G_RANGE: f32 = 16384.0;
+
+                        raw as f32 * G_RANGE / SENSOR_RES / 1000.0
+                    }
+                    let accel_x = accel([value[0], value[1]]);
+                    let accel_y = accel([value[2], value[3]]);
+                    let accel_z = accel([value[4], value[5]]);
+
+                    fn gyro(raw: [u8; 2]) -> f32 {
+                        let raw = i16::from_le_bytes([raw[0], raw[1]]);
+                        const G_GAIN: f32 = 4588.0;
+
+                        raw as f32 * G_GAIN / SENSOR_RES
+                    }
+                    let gyro_1 = gyro([value[6], value[7]]);
+                    let gyro_2 = gyro([value[8], value[9]]);
+                    let gyro_3 = gyro([value[10], value[11]]);
+
+                    AxisData {
+                        accel_x,
+                        accel_y,
+                        accel_z,
+                        gyro_1,
+                        gyro_2,
+                        gyro_3,
+                    }
+                }
+            }
+
+            pub struct CommonReport {
+                input_report_id: u8,
+                timer: u8,
+                battery: Battery,
+                connection_info: ConnectionInfo,
+                pushed_buttons: PushedButtons,
+                left_analog_stick_data: AnalogStickData,
+                right_analog_stick_data: AnalogStickData,
+                vibrator_input_report: u8,
+            }
+
+            impl From<[u8; 13]> for CommonReport {
+                fn from(report: [u8; 13]) -> Self {
+                    let input_report_id = report[0];
+                    let timer = report[1];
+
+                    let (battery, connection_info) = {
+                        let value = report[2];
+                        let high_nibble = value / 16;
+                        let low_nibble = value % 16;
+
+                        (Battery::try_from(high_nibble)?, ConnectionInfo::try_from(low_nibble)?)
+                    };
+
+                    let pushed_buttons = {
+                        let array = [report[3], report[4], report[5]];
+                        PushedButtons::from(array)
+                    };
+
+                    let left_analog_stick_data = {
+                        let array = [report[6], report[7], report[8]];
+                        AnalogStickData::from(array)
+                    };
+                    let right_analog_stick_data = {
+                        let array = [report[9], report[10], report[11]];
+                        AnalogStickData::from(array)
+                    };
+
+                    let vibrator_input_report = report[12];
+
+                    CommonReport {
+                        input_report_id,
+                        timer,
+                        battery,
+                        connection_info,
+                        pushed_buttons,
+                        left_analog_stick_data,
+                        right_analog_stick_data,
+                        vibrator_input_report,
+                    }
+                }
             }
         }
 
-        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
-        pub enum Device {
-            JoyCon,
-            ProConOrChargingGrip,
+        pub trait InputReportMode<D: JoyConDriver>: Deref<Target = D> + DerefMut<Target = D> {
+            type Mode: InputReportMode;
+            type Report: TryFrom<&[u8], Error = JoyConError>;
+
+            /// set Joy-Con's input report mode and return instance
+            fn set(driver: D) -> JoyConResult<Self::Mode>;
+
+            /// read Joy-Con's input report
+            fn read_input_report(&self) -> JoyConResult<Self::Report> {
+                // read
+                let mut buf = [0x00;362];
+                self.read(&mut buf)?;
+                // convert
+                Self::Report::try_from(&buf)
+            }
         }
 
-        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-        pub struct ConnectionInfo {
-            device: Device,
-            is_powered: bool,
+        pub struct ExtraReport<'a>(&'a [u8]);
+
+        pub struct StandardInputReport<EX: TryFrom<ExtraReport, Error = JoyConError>> {
+            common: CommonReport,
+            extra: EX,
         }
 
-        impl TryFrom<u8> for ConnectionInfo {
+        impl<EX: TryFrom<ExtraReport, Error = JoyConError>> TryFrom<&[u8]> for StandardInputReport<EX> {
             type Error = JoyConError;
 
-            fn try_from(value: u8) -> Result<Self, Self::Error> {
-                let device = match (value >> 1) & 3 {
-                    3 => Device::JoyCon,
-                    0 => Device::ProConOrChargingGrip,
-                    _ => Err(InvalidStandardFullReport::ConnectionInfo(value))?
-                };
-                let is_powered = (value & 1) == 1;
+            fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                // check length
+                if value.len() < 13 {
+                    Err(InvalidStandardInputReport::InvalidReport(value.to_vec()))?
+                }
 
-                Ok(ConnectionInfo {
-                    device,
-                    is_powered,
+                // common report
+                let common = {
+                    let mut value = [0x00; 13];
+                    value.copy_from_slice(&value[0..13]);
+                    CommonReport::try_from(value)?
+                };
+
+                // extra report
+                let extra = {
+                    let ex_report = ExtraReport(&value[13..]);
+                    EX::try_from(ex_report)?
+                };
+
+                Ok(StandardInputReport {
+                    common,
+                    extra
                 })
             }
         }
 
-        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-        pub struct PushedButtons {
-            right: Vec<Buttons>,
-            shared: Vec<Buttons>,
-            left: Vec<Buttons>,
-        }
+        mod sub_command_mode {
+            use super::*;
+            use std::convert::TryFrom;
 
-        impl PushedButtons {
-            const RIGHT_BUTTONS: [Buttons; 8] = [
-                Buttons::Y,
-                Buttons::X,
-                Buttons::B,
-                Buttons::A,
-                Buttons::SR,
-                Buttons::SL,
-                Buttons::R,
-                Buttons::ZR,
-            ];
-            const SHARED_BUTTONS: [Buttons; 8] = [
-                Buttons::Minus,
-                Buttons::Plus,
-                Buttons::RStick,
-                Buttons::LStick,
-                Buttons::Home,
-                Buttons::Capture,
-                // originally none
-                Buttons::Capture,
-                Buttons::ChargingGrip,
-            ];
-            const LEFT_BUTTONS: [Buttons; 8] = [
-                Buttons::Down,
-                Buttons::Up,
-                Buttons::Right,
-                Buttons::Left,
-                Buttons::SR,
-                Buttons::SL,
-                Buttons::L,
-                Buttons::ZL,
-            ];
-        }
+            /// Joy-Con emitting standard input report with sub-command reply
+            pub struct SubCommandMode<D: JoyConDriver> {
+                driver: D
+            }
 
-        impl From<[u8; 3]> for PushedButtons {
-            fn from(value: [u8; 3]) -> Self {
-                let right_val = value[0];
-                let shared_val = value[1];
-                let left_val = value[2];
+            #[derive(Clone)]
+            pub struct SubCommandReply {
+                ack_byte: u8,
+                sub_command_id: u8,
+                reply: [u8; 35],
+            }
 
-                let right = PushedButtons::RIGHT_BUTTONS.iter()
-                    .enumerate()
-                    .filter(|(idx, _)| {
-                        let idx = 2u8.pow(*idx as u32) as u8;
-                        right_val & idx == idx
+            impl TryFrom<ExtraReport> for SubCommandReply {
+                type Error = JoyConError;
+
+                fn try_from(value: ExtraReport) -> Result<Self, Self::Error> {
+                    let value = value.0;
+                    // check length
+                    if value.len() < 37 {
+                        Err(InvalidStandardInputReport::InvalidExtraReport(value.to_vec()))?
+                    }
+                    let ack_byte = value[0];
+                    let sub_command_id = value[1];
+                    let mut reply = [0x00; 35];
+                    reply.copy_from_slice(&value[2..37]);
+
+                    Ok(SubCommandReply {
+                        ack_byte,
+                        sub_command_id,
+                        reply,
                     })
-                    .map(|(_, b)| b.clone())
-                    .collect();
-                let shared = PushedButtons::SHARED_BUTTONS.iter()
-                    .enumerate()
-                    .filter(|(idx, _)| {
-                        let idx = 2u8.pow(*idx as u32) as u8;
-                        shared_val & idx == idx
-                    })
-                    .map(|(_, b)| b.clone())
-                    .collect();
-                let left = PushedButtons::LEFT_BUTTONS.iter()
-                    .enumerate()
-                    .filter(|(idx, _)| {
-                        let idx = 2u8.pow(*idx as u32) as u8;
-                        left_val & idx == idx
-                    })
-                    .map(|(_, b)| b.clone())
-                    .collect();
+                }
+            }
 
-                PushedButtons {
-                    right,
-                    shared,
-                    left,
+            impl<D: JoyConDriver> InputReportMode<D> for SubCommandMode<D> {
+                type Mode = SubCommandMode<D>;
+                type Report = StandardInputReport<SubCommandReply>;
+
+                fn set(driver: D) -> JoyConResult<Self::Mode> {
+                    let mut driver = driver;
+                    // set input report mode to sub command mode
+                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x21])?;
+
+                    Ok(SubCommandMode { driver })
+                }
+
+                fn read_input_report(&self) -> JoyConResult<Self::Report> {
+                    unimplemented!()
+                }
+            }
+
+            impl<D> Deref for SubCommandMode<D> {
+                type Target = D;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.driver
+                }
+            }
+
+            impl<D> DerefMut for SubCommandMode<D> {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.driver
                 }
             }
         }
 
-        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-        pub struct AnalogStickData {
-            horizontal: u16,
-            vertical: u16,
-        }
-
-        impl From<[u8; 3]> for AnalogStickData {
-            fn from(value: [u8; 3]) -> Self {
-                let horizontal = value[0] as u16 | ((value[1] as u16 & 0xF) << 8);
-                let vertical = (value[1] as u16 >> 4) | ((value[2] as u16) << 4);
-
-                Self {
-                    horizontal,
-                    vertical,
-                }
-            }
-        }
-
-        #[derive(Debug, Clone, Copy, PartialEq)]
-        pub struct AxisData {
-            /// Acceleration to X measured in Gs
-            pub accel_x: f32,
-            /// Acceleration to Y measured in Gs
-            pub accel_y: f32,
-            /// Acceleration to Z measured in Gs
-            pub accel_z: f32,
-            /// Rotation of X measured in degree/s
-            pub gyro_1: f32,
-            /// Rotation of Y measured in degree/s
-            pub gyro_2: f32,
-            /// Rotation of Z measured in degree/s
-            pub gyro_3: f32,
-        }
-
-        impl From<[u8; 12]> for AxisData {
-            fn from(value: [u8; 12]) -> Self {
-                const SENSOR_RES: f32 = 65535.0;
-                fn accel(raw: [u8; 2]) -> f32 {
-                    let raw = i16::from_le_bytes([raw[0], raw[1]]);
-                    const G_RANGE: f32 = 16384.0;
-
-                    raw as f32 * G_RANGE / SENSOR_RES / 1000.0
-                }
-                let accel_x = accel([value[0], value[1]]);
-                let accel_y = accel([value[2], value[3]]);
-                let accel_z = accel([value[4], value[5]]);
-
-                fn gyro(raw: [u8; 2]) -> f32 {
-                    let raw = i16::from_le_bytes([raw[0], raw[1]]);
-                    const G_GAIN: f32 = 4588.0;
-
-                    raw as f32 * G_GAIN / SENSOR_RES
-                }
-                let gyro_1 = gyro([value[6], value[7]]);
-                let gyro_2 = gyro([value[8], value[9]]);
-                let gyro_3 = gyro([value[10], value[11]]);
-
-                AxisData {
-                    accel_x,
-                    accel_y,
-                    accel_z,
-                    gyro_1,
-                    gyro_2,
-                    gyro_3,
-                }
-            }
-        }
-
+        mod 
+    }
         #[allow(non_camel_case_types)]
         #[derive(Clone)]
         pub enum ExtraData {
