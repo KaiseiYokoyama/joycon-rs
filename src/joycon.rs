@@ -453,7 +453,7 @@ mod driver {
                 Full,
             }
 
-            #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
             pub struct Battery {
                 pub level: BatteryLevel,
                 pub is_charging: bool,
@@ -486,7 +486,7 @@ mod driver {
                 ProConOrChargingGrip,
             }
 
-            #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
             pub struct ConnectionInfo {
                 device: Device,
                 is_powered: bool,
@@ -645,6 +645,7 @@ mod driver {
                 }
             }
 
+            #[derive(Debug, Clone, PartialEq)]
             pub struct CommonReport {
                 input_report_id: u8,
                 timer: u8,
@@ -749,9 +750,19 @@ mod driver {
             }
         }
 
+        impl<EX: TryFrom<[u8; 349], Error=JoyConError> + Debug> Debug for StandardInputReport<EX> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    "StandardInputReport {{ common: {:?}, extra: {:?} }}",
+                    &self.common,
+                    &self.extra,
+                )
+            }
+        }
+
         pub mod sub_command_mode {
             use super::*;
-            use std::fmt::Error;
 
             /// Joy-Con emitting standard input report with sub-command reply
             pub struct SubCommandMode<D: JoyConDriver> {

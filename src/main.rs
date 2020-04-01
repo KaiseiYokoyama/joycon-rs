@@ -1,6 +1,7 @@
 use joycon_rs::prelude::*;
 use joycon_rs::joycon::{JoyConManager, SimpleJoyConDriver, Rotation, JoyConDriver, SubCommand, input_report_mode::*};
-use joycon_rs::joycon::input_report_mode::simple_hid_mode::SimpleHIDMode;
+// use joycon_rs::joycon::input_report_mode::simple_hid_mode::SimpleHIDMode;
+use joycon_rs::joycon::input_report_mode::standard_full_mode::StandardFullMode;
 
 fn main() -> JoyConResult<()> {
     // use joycon_rs::joycon::simple_hid_mode::SimpleHidMode;
@@ -17,9 +18,10 @@ fn main() -> JoyConResult<()> {
             let sender = send.clone();
             std::thread::spawn(move || {
                 // enable 6-axis sensor
-                let simple_hid_mode = SimpleHIDMode::set(driver).unwrap();
+                // let simple_hid_mode = SimpleHIDMode::set(driver).unwrap();
+                let standard_full_mode = StandardFullMode::set(driver).unwrap();
                 loop {
-                    if let Ok(update) = simple_hid_mode.read_input_report() {
+                    if let Ok(update) = standard_full_mode.read_input_report() {
                         sender.send(update);
                     }
                 }
