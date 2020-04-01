@@ -35,13 +35,32 @@ pub mod result {
 
     #[derive(Debug)]
     pub enum JoyConReportError {
-        InvalidSimpleHIDReport(Vec<u8>),
-        InvalidStandardFullReport(InvalidStandardInputReport),
+        InvalidSimpleHidReport(InvalidSimpleHIDReport),
+        InvalidStandardInputReport(InvalidStandardInputReport),
     }
 
     impl From<JoyConReportError> for JoyConError {
         fn from(e: JoyConReportError) -> Self {
             JoyConError::JoyConReportError(e)
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum InvalidSimpleHIDReport {
+        InvalidReport(Vec<u8>),
+        InvalidStickDirection(u8),
+    }
+
+    impl From<InvalidSimpleHIDReport> for JoyConReportError {
+        fn from(e: InvalidSimpleHIDReport) -> Self {
+            JoyConReportError::InvalidSimpleHidReport(e)
+        }
+    }
+
+    impl From<InvalidSimpleHIDReport> for JoyConError {
+        fn from(e: InvalidSimpleHIDReport) -> Self {
+            let report_error = JoyConReportError::from(e);
+            JoyConError::from(report_error)
         }
     }
 
@@ -56,7 +75,7 @@ pub mod result {
 
     impl From<InvalidStandardInputReport> for JoyConReportError {
         fn from(e: InvalidStandardInputReport) -> Self {
-            JoyConReportError::InvalidStandardFullReport(e)
+            JoyConReportError::InvalidStandardInputReport(e)
         }
     }
 

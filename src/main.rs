@@ -1,5 +1,5 @@
 use joycon_rs::prelude::*;
-use joycon_rs::joycon::{JoyConManager, SimpleJoyConDriver, Rotation, JoyConDriver, SubCommand};
+// use joycon_rs::joycon::{JoyConManager, SimpleJoyConDriver, Rotation, JoyConDriver, SubCommand};
 
 fn main() -> JoyConResult<()> {
     // use joycon_rs::joycon::simple_hid_mode::SimpleHidMode;

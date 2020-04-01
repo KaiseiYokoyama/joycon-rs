@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub use joycon_device::JoyConDevice;
 // pub use joycon::JoyCon;
-pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, simple_hid_mode, Command, SubCommand};
+pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, Command, SubCommand};
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
@@ -30,19 +30,6 @@ pub enum Buttons {
     SL,
     SR,
     ChargingGrip,
-}
-
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
-pub enum StickDirection {
-    Left,
-    UpperLeft,
-    Up,
-    UpperRight,
-    Right,
-    BottomRight,
-    Bottom,
-    BottomLeft,
-    Neutral,
 }
 
 struct DebugHidDevice<'a>(&'a HidDevice);
@@ -321,7 +308,7 @@ mod driver {
     }
 
     impl SimpleJoyConDriver {
-        pub fn new(joycon: JoyConDevice) -> Self {
+        pub fn new(joycon: JoyConDevice) -> JoyConResult<Self> {
             let mut driver = Self {
                 joycon,
                 rotation: Rotation::Portrait,
@@ -329,9 +316,9 @@ mod driver {
                 global_packet_number: GlobalPacketNumber::default(),
             };
 
-            driver.reset();
+            driver.reset()?;
 
-            driver
+            Ok(driver)
         }
     }
 
@@ -391,6 +378,8 @@ mod driver {
         fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()>;
 
         fn enabled_features(&self) -> &HashSet<JoyConFeatures>;
+
+        fn devices(&self) -> Vec<&JoyConDevice>;
     }
 
     impl JoyConDriver for SimpleJoyConDriver {
@@ -433,6 +422,10 @@ mod driver {
         fn enabled_features(&self) -> &HashSet<JoyConFeatures> {
             &self.enabled_features
         }
+
+        fn devices(&self) -> Vec<&JoyConDevice> {
+            vec![&self.joycon]
+        }
     }
 
     mod input_report_mode {
@@ -474,7 +467,7 @@ mod driver {
                         4 => BatteryLevel::Low,
                         6 => BatteryLevel::Medium,
                         8 => BatteryLevel::Full,
-                        _ => Err(JoyConReportError::InvalidStandardFullReport(InvalidStandardInputReport::Battery(value)))?
+                        _ => Err(JoyConReportError::InvalidStandardInputReport(InvalidStandardInputReport::Battery(value)))?
                     };
 
                     Ok(Battery { level, is_charging })
@@ -704,22 +697,23 @@ mod driver {
 
         pub trait InputReportMode<D: JoyConDriver>: Deref<Target=D> + DerefMut<Target=D> {
             type Mode: InputReportMode<D>;
-            type Report: TryFrom<[u8; 362], Error=JoyConError>;
+            type Report;
 
             /// set Joy-Con's input report mode and return instance
             fn set(driver: D) -> JoyConResult<Self::Mode>;
 
             /// read Joy-Con's input report
-            fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                // read
-                let mut buf = [0x00; 362];
-                self.read(&mut buf)?;
-                // convert
-                Self::Report::try_from(buf)
-            }
+            fn read_input_report(&self) -> JoyConResult<Self::Report>;
+            // {
+            //     // read
+            //     let mut buf = [0x00; 362];
+            //     self.read(&mut buf)?;
+            //     // convert
+            //     Self::Report::try_from(buf)
+            // }
         }
 
-        pub struct StandardInputReport<EX: TryFrom<[u8;349], Error = JoyConError>> {
+        pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
             common: CommonReport,
             extra: EX,
         }
@@ -764,10 +758,10 @@ mod driver {
                 reply: [u8; 35],
             }
 
-            impl TryFrom<[u8;349]> for SubCommandReply {
+            impl TryFrom<[u8; 349]> for SubCommandReply {
                 type Error = JoyConError;
 
-                fn try_from(value: [u8;349]) -> Result<Self, Self::Error> {
+                fn try_from(value: [u8; 349]) -> Result<Self, Self::Error> {
                     let ack_byte = value[0];
                     let sub_command_id = value[1];
                     let mut reply = [0x00; 35];
@@ -794,7 +788,11 @@ mod driver {
                 }
 
                 fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                    unimplemented!()
+                    // read
+                    let mut buf = [0x00; 362];
+                    self.read(&mut buf)?;
+                    // convert
+                    Self::Report::try_from(buf)
                 }
             }
 
@@ -822,10 +820,10 @@ mod driver {
                 data: [AxisData; 3]
             }
 
-            impl TryFrom<[u8;349]> for IMUData {
+            impl TryFrom<[u8; 349]> for IMUData {
                 type Error = JoyConError;
 
-                fn try_from(value: [u8;349]) -> Result<Self, Self::Error> {
+                fn try_from(value: [u8; 349]) -> Result<Self, Self::Error> {
                     let latest = {
                         let mut latest = [0x00; 12];
                         latest.copy_from_slice(&value[0..12]);
@@ -880,8 +878,6 @@ mod driver {
                 fn set(driver: D) -> JoyConResult<Self::Mode> {
                     let mut driver = driver;
                     // enable IMU(6-Axis sensor)
-                    driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
-                    // set input report mode to standard full mode
                     let imf_enabled = driver.enabled_features()
                         .iter()
                         .any(|jf| match jf {
@@ -893,180 +889,180 @@ mod driver {
                     }
                     // set input report mode to standard full mode
                     driver.send_sub_command(SubCommand::SetInputReportMode, &[0x30])?;
-                    }
 
                     Ok(StandardFullMode { driver })
                 }
-            }
-        }
-    }
 
-    pub mod simple_hid_mode {
-        use super::*;
-        use crate::result::JoyConResult;
-
-        /// Pushed buttons and stick direction.
-        #[derive(Debug, Clone)]
-        pub struct SimpleHidUpdate {
-            pub pushed_buttons: Vec<Buttons>,
-            pub stick_direction: StickDirection,
-        }
-
-        impl SimpleHidUpdate {
-            pub fn parse<P>(data: &[u8], parser: P) -> JoyConResult<Self>
-                where P: Fn(&[u8]) -> JoyConResult<SimpleHidUpdate> {
-                parser(data)
+                fn read_input_report(&self) -> JoyConResult<Self::Report> {
+                    // read
+                    let mut buf = [0x00; 362];
+                    self.read(&mut buf)?;
+                    // convert
+                    Self::Report::try_from(buf)
+                }
             }
         }
 
-        pub trait SimpleHidMode {
-            /// Pushes updates with every button press
-            fn set_simple_hid_mode(&mut self) -> JoyConResult<usize>;
+        mod simple_hid_mode {
+            use super::*;
 
-            fn read_update(&self) -> JoyConResult<SimpleHidUpdate>;
-        }
-
-        const BUTTONS_JOYCON_L_1: [Buttons; 6] = [
-            Buttons::Left,
-            Buttons::Down,
-            Buttons::Up,
-            Buttons::Right,
-            Buttons::SL,
-            Buttons::SR];
-        const BUTTONS_JOYCON_L_2: [Buttons; 8] = [
-            Buttons::Minus,
-            Buttons::Plus,
-            Buttons::LStick,
-            Buttons::RStick,
-            Buttons::Home,
-            Buttons::Capture,
-            Buttons::L,
-            Buttons::ZL];
-        const BUTTONS_JOYCON_R_1: [Buttons; 6] = [
-            Buttons::A,
-            Buttons::X,
-            Buttons::B,
-            Buttons::Y,
-            Buttons::SL,
-            Buttons::SR];
-        const BUTTONS_JOYCON_R_2: [Buttons; 8] = [
-            Buttons::Minus,
-            Buttons::Plus,
-            Buttons::LStick,
-            Buttons::RStick,
-            Buttons::Home,
-            Buttons::Capture,
-            Buttons::R,
-            Buttons::ZR];
-        const STICK_JOYCON_L_PORTRAIT: [StickDirection; 9] = [
-            StickDirection::Right,
-            StickDirection::BottomRight,
-            StickDirection::Bottom,
-            StickDirection::BottomLeft,
-            StickDirection::Left,
-            StickDirection::UpperLeft,
-            StickDirection::Up,
-            StickDirection::UpperRight,
-            StickDirection::Neutral];
-        const STICK_JOYCON_L_LANDSCAPE: [StickDirection; 9] = [
-            StickDirection::Up,
-            StickDirection::UpperRight,
-            StickDirection::Right,
-            StickDirection::BottomRight,
-            StickDirection::Bottom,
-            StickDirection::BottomLeft,
-            StickDirection::Left,
-            StickDirection::UpperLeft,
-            StickDirection::Neutral];
-        const STICK_JOYCON_R_PORTRAIT: [StickDirection; 9] = [
-            StickDirection::Left,
-            StickDirection::UpperLeft,
-            StickDirection::Up,
-            StickDirection::UpperRight,
-            StickDirection::Right,
-            StickDirection::BottomRight,
-            StickDirection::Bottom,
-            StickDirection::BottomLeft,
-            StickDirection::Neutral];
-        const STICK_JOYCON_R_LANDSCAPE: [StickDirection; 9] = [
-            StickDirection::Up,
-            StickDirection::UpperRight,
-            StickDirection::Right,
-            StickDirection::BottomRight,
-            StickDirection::Bottom,
-            StickDirection::BottomLeft,
-            StickDirection::Left,
-            StickDirection::UpperLeft,
-            StickDirection::Neutral];
-
-        impl SimpleHidMode for SimpleJoyConDriver {
-            fn set_simple_hid_mode(&mut self) -> JoyConResult<usize> {
-                self.send_command(Command::RumbleAndSubCommand, SubCommand::SetInputReportMode, &[0x3F])
+            #[allow(non_camel_case_types)]
+            #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+            pub enum SimpleHIDButton {
+                Down,
+                Right,
+                Left,
+                Up,
+                SL,
+                SR,
+                Minus,
+                Plus,
+                LeftStick,
+                RightStick,
+                Home,
+                Capture,
+                L_R,
+                ZL_ZR,
             }
 
-            fn read_update(&self) -> JoyConResult<SimpleHidUpdate> {
-                let mut buf = [0x00; 0x40];
-                self.read(&mut buf)?;
+            const BUTTON1: [SimpleHIDButton; 6] = {
+                use SimpleHIDButton::*;
+                [Down, Right, Left, Up, SL, SR, ]
+            };
+            const BUTTON2: [SimpleHIDButton; 8] = {
+                use SimpleHIDButton::*;
+                [Minus, Plus, LeftStick, RightStick, Home, Capture, L_R, ZL_ZR, ]
+            };
 
-                SimpleHidUpdate::parse(&buf, |report| {
-                    let buttons_1 = match &self.joycon {
-                        JoyConDevice::JoyConL(_) => &BUTTONS_JOYCON_L_1,
-                        JoyConDevice::JoyConR(_) => &BUTTONS_JOYCON_R_1,
-                    };
-                    let buttons_2 = match &self.joycon {
-                        JoyConDevice::JoyConL(_) => &BUTTONS_JOYCON_L_2,
-                        JoyConDevice::JoyConR(_) => &BUTTONS_JOYCON_R_2,
-                    };
-                    let stick_directions = match (&self.joycon, &self.rotation) {
-                        (JoyConDevice::JoyConL(_), &Rotation::Portrait) => &STICK_JOYCON_L_PORTRAIT,
-                        (JoyConDevice::JoyConL(_), &Rotation::Landscape) => &STICK_JOYCON_L_LANDSCAPE,
-                        (JoyConDevice::JoyConR(_), &Rotation::Portrait) => &STICK_JOYCON_R_PORTRAIT,
-                        (JoyConDevice::JoyConR(_), &Rotation::Landscape) => &STICK_JOYCON_R_LANDSCAPE,
+            /// Hold your controller sideways so that SL, SYNC, and SR line up with the screen. Pushing the stick towards a direction in this table will cause that value to be sent.
+            #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+            pub enum StickDirection {
+                Up,
+                UpperRight,
+                Right,
+                BottomRight,
+                Bottom,
+                BottomLeft,
+                Left,
+                UpperLeft,
+                Neutral,
+            }
+
+            impl TryFrom<u8> for StickDirection {
+                type Error = JoyConError;
+
+                fn try_from(value: u8) -> Result<Self, Self::Error> {
+                    use StickDirection::*;
+
+                    let button = match value {
+                        0 => Up,
+                        1 => UpperRight,
+                        2 => Right,
+                        3 => BottomRight,
+                        4 => Bottom,
+                        5 => BottomLeft,
+                        6 => Left,
+                        7 => UpperLeft,
+                        8 => Neutral,
+                        v => Err(InvalidSimpleHIDReport::InvalidStickDirection(v))?,
                     };
 
-                    let button_value_1 = report.get(1)
-                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?;
-                    let button_value_2 = report.get(2)
-                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?;
+                    Ok(button)
+                }
+            }
 
+            /// Pushed buttons and stick direction.
+            #[derive(Debug, Clone)]
+            pub struct SimpleHIDUpdate {
+                pub input_report_id: u8,
+                pub pushed_buttons: Vec<SimpleHIDButton>,
+                pub stick_direction: StickDirection,
+                pub filter_data: [u8; 8],
+            }
+
+            impl TryFrom<[u8; 12]> for SimpleHIDUpdate {
+                type Error = JoyConError;
+
+                fn try_from(value: [u8; 12]) -> Result<Self, Self::Error> {
+                    let input_report_id = value[0];
                     let pushed_buttons = {
-                        let mut pushed_buttons = Vec::new();
-
-                        let mut pushed_buttons_1 = buttons_1.iter()
-                            .enumerate()
-                            .filter(|(i, _)| {
-                                let idx = 2u8.pow(*i as u32) as u8;
-                                button_value_1 & idx == idx
-                            })
-                            .map(|(_, b)| b.clone())
-                            .collect::<Vec<_>>();
-                        pushed_buttons.append(&mut pushed_buttons_1);
-
-                        let mut pushed_buttons_2 = buttons_2.iter()
-                            .enumerate()
-                            .filter(|(i, _)| {
-                                let idx = 2u8.pow(*i as u32) as u8;
-                                button_value_2 & idx == idx
-                            })
-                            .map(|(_, b)| b.clone())
-                            .collect::<Vec<_>>();
-                        pushed_buttons.append(&mut pushed_buttons_2);
-
-                        pushed_buttons
+                        let byte_1 = value[1];
+                        let byte_2 = value[2];
+                        [].iter()
+                            .chain(
+                                BUTTON1.iter()
+                                    .enumerate()
+                                    .filter(|(idx, _)| {
+                                        let idx = 2u8.pow(*idx as u32) as u8;
+                                        idx & byte_1 == byte_1
+                                    })
+                                    .map(|(_, b)| b)
+                            )
+                            .chain(
+                                BUTTON2.iter()
+                                    .enumerate()
+                                    .filter(|(idx, _)| {
+                                        let idx = 2u8.pow(*idx as u32) as u8;
+                                        idx & byte_2 == byte_2
+                                    })
+                                    .map(|(_, b)| b)
+                            )
+                            .cloned()
+                            .collect()
+                    };
+                    let stick_direction = StickDirection::try_from(value[3])?;
+                    let filter_data = {
+                        let mut buf = [0u8; 8];
+                        buf.copy_from_slice(&value[4..12]);
+                        buf
                     };
 
-                    let stick_value = report.get(3)
-                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?;
-
-                    let stick_direction = stick_directions.get(stick_value.clone() as usize)
-                        .ok_or(JoyConReportError::InvalidSimpleHIDReport(report.to_vec()))?
-                        .clone();
-
-                    Ok(SimpleHidUpdate {
+                    Ok(SimpleHIDUpdate {
+                        input_report_id,
                         pushed_buttons,
                         stick_direction,
+                        filter_data,
                     })
-                })
+                }
+            }
+
+            pub struct SimpleHIDMode<D: JoyConDriver> {
+                driver: D,
+            }
+
+            impl<D: JoyConDriver> Deref for SimpleHIDMode<D> {
+                type Target = D;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.driver
+                }
+            }
+
+            impl<D: JoyConDriver> DerefMut for SimpleHIDMode<D> {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.driver
+                }
+            }
+
+            impl<D: JoyConDriver> InputReportMode<D> for SimpleHIDMode<D> {
+                type Mode = SimpleHIDMode<D>;
+                type Report = SimpleHIDUpdate;
+
+                fn set(driver: D) -> JoyConResult<Self::Mode> {
+                    let mut driver = driver;
+                    // set input report mode to simple hid mode
+                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x3F])?;
+
+                    Ok(SimpleHIDMode { driver })
+                }
+
+                fn read_input_report(&self) -> JoyConResult<Self::Report> {
+                    // read
+                    let mut buf = [0x00; 12];
+                    self.read(&mut buf)?;
+                    // convert
+                    Self::Report::try_from(buf)
+                }
             }
         }
     }
