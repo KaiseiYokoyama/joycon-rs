@@ -2,7 +2,15 @@ use crate::prelude::*;
 
 pub use joycon_device::JoyConDevice;
 // pub use joycon::JoyCon;
-pub use driver::{Rotation, JoyConDriver, GlobalPacketNumber, SimpleJoyConDriver, Command, SubCommand};
+pub use driver::{
+    Rotation,
+    JoyConDriver,
+    GlobalPacketNumber,
+    SimpleJoyConDriver,
+    Command,
+    SubCommand,
+    input_report_mode,
+};
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
@@ -342,8 +350,6 @@ mod driver {
 
             // set sub command
             buf[10] = sub_command;
-            dbg!(buf.to_vec());
-            dbg!(&data);
             // set data
             buf[11..11 + data.len()].copy_from_slice(data);
 
@@ -428,7 +434,7 @@ mod driver {
         }
     }
 
-    mod input_report_mode {
+    pub mod input_report_mode {
         use super::*;
         pub use common::*;
         use std::convert::TryFrom;
@@ -743,8 +749,9 @@ mod driver {
             }
         }
 
-        mod sub_command_mode {
+        pub mod sub_command_mode {
             use super::*;
+            use std::fmt::Error;
 
             /// Joy-Con emitting standard input report with sub-command reply
             pub struct SubCommandMode<D: JoyConDriver> {
@@ -756,6 +763,17 @@ mod driver {
                 ack_byte: u8,
                 sub_command_id: u8,
                 reply: [u8; 35],
+            }
+
+            impl Debug for SubCommandReply {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f,
+                           "SubCommandReply {{ ack_byte: {}, sub_command_id: {}, reply: [{}] }}",
+                           self.ack_byte,
+                           self.sub_command_id,
+                           self.reply.iter().map(|&u| u as char).collect::<String>()
+                    )
+                }
             }
 
             impl TryFrom<[u8; 349]> for SubCommandReply {
@@ -811,11 +829,11 @@ mod driver {
             }
         }
 
-        mod standard_full_mode {
+        pub mod standard_full_mode {
             use super::*;
 
             /// 6-Axis data. 3 frames of 2 groups of 3 Int16LE each. Group is Acc followed by Gyro.
-            #[derive(Clone)]
+            #[derive(Debug, Clone)]
             pub struct IMUData {
                 data: [AxisData; 3]
             }
@@ -903,7 +921,7 @@ mod driver {
             }
         }
 
-        mod simple_hid_mode {
+        pub mod simple_hid_mode {
             use super::*;
 
             #[allow(non_camel_case_types)]
@@ -994,7 +1012,7 @@ mod driver {
                                     .enumerate()
                                     .filter(|(idx, _)| {
                                         let idx = 2u8.pow(*idx as u32) as u8;
-                                        idx & byte_1 == byte_1
+                                        byte_1 & idx == idx
                                     })
                                     .map(|(_, b)| b)
                             )
@@ -1003,7 +1021,7 @@ mod driver {
                                     .enumerate()
                                     .filter(|(idx, _)| {
                                         let idx = 2u8.pow(*idx as u32) as u8;
-                                        idx & byte_2 == byte_2
+                                        byte_2 & idx == idx
                                     })
                                     .map(|(_, b)| b)
                             )
