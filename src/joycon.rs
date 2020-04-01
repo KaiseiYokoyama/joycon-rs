@@ -879,8 +879,21 @@ mod driver {
 
                 fn set(driver: D) -> JoyConResult<Self::Mode> {
                     let mut driver = driver;
+                    // enable IMU(6-Axis sensor)
+                    driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
+                    // set input report mode to standard full mode
+                    let imf_enabled = driver.enabled_features()
+                        .iter()
+                        .any(|jf| match jf {
+                            JoyConFeatures::IMUFeature(_) => true,
+                            _ => false,
+                        });
+                    if !imf_enabled {
+                        driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
+                    }
                     // set input report mode to standard full mode
                     driver.send_sub_command(SubCommand::SetInputReportMode, &[0x30])?;
+                    }
 
                     Ok(StandardFullMode { driver })
                 }
