@@ -10,6 +10,7 @@ pub use driver::{
     Command,
     SubCommand,
     input_report_mode,
+    lights,
 };
 
 use std::sync::Arc;
@@ -1094,6 +1095,86 @@ mod driver {
                 }
             }
         }
+    }
+
+    pub mod lights {
+        use super::*;
+
+        /// LED to keep on lightning up / lightning
+        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum LightUp {
+            /// closest led to SL Button
+            LED0 = 0x01,
+            /// second closest led to SL Button
+            LED1 = 0x02,
+            /// second closest led to SR Button
+            LED2 = 0x04,
+            /// closest let to SR Button
+            LED3 = 0x08,
+        }
+
+        /// LED to flash / flashing
+        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum Flash {
+            /// closest led to SL Button
+            LED0 = 0x10,
+            /// second closest led to SL Button
+            LED1 = 0x20,
+            /// second closest led to SR Button
+            LED2 = 0x40,
+            /// closest let to SR Button
+            LED3 = 0x80,
+        }
+
+        pub trait Lights: JoyConDriver {
+            const LIGHT_UP: [LightUp; 4] =
+                [LightUp::LED0, LightUp::LED1, LightUp::LED2, LightUp::LED3];
+            const FLASH: [Flash; 4] =
+                [Flash::LED0, Flash::LED1, Flash::LED2, Flash::LED3];
+            /// light up or flash LEDs on controller, vice versa.
+            fn set_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<usize> {
+                let arg = light_up.iter()
+                    .map(|&lu| lu as u8)
+                    .sum::<u8>()
+                    + flash.iter()
+                    .map(|&f| f as u8)
+                    .sum::<u8>();
+
+                self.send_sub_command(SubCommand::SetPlayerLights, &[arg])
+            }
+
+            /// Get status of LEDs on controller
+            fn get_lights(&mut self) -> JoyConResult<(Vec<LightUp>, Vec<Flash>)> {
+                self.send_sub_command(SubCommand::GetPlayerLights, &[])?;
+
+                // read reply
+                let mut buf = [0; 16];
+                // Joy-Con send standard input report with sub-command reply
+                self.read(&mut buf)?;
+                let value = buf[15];
+
+
+                // parse reply
+                let light_up = Self::LIGHT_UP.iter()
+                    .filter(|&&l| {
+                        let light = l as u8;
+                        value & light == light
+                    })
+                    .cloned()
+                    .collect();
+                let flash = Self::FLASH.iter()
+                    .filter(|&&f| {
+                        let flash = f as u8;
+                        value & flash == flash
+                    })
+                    .cloned()
+                    .collect();
+
+                Ok((light_up, flash))
+            }
+        }
+
+        impl Lights for SimpleJoyConDriver {}
     }
 
     #[allow(non_camel_case_types)]
