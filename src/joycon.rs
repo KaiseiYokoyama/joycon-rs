@@ -762,7 +762,56 @@ mod driver {
             }
         }
 
-        pub mod sub_command_mode {
+        /// Modes reply standard input report
+        pub trait StandardInputReportMode<D>: Deref<Target=D> + DerefMut<Target=D> where D: JoyConDriver {
+            const SUB_COMMAND: SubCommand;
+            const ARGS: Self::ArgsType;
+            type ArgsType: AsRef<[u8]>;
+            type Mode: StandardInputReportMode<D>;
+            type ExtraReport: TryFrom<[u8; 349], Error=JoyConError>;
+
+            /// Mode's setup operation.
+            /// There are no needs to change Joy-Con's input report mode, leave it to `InputReportMode<D>::set()`.
+            /// ex. Enable 6-Axis sensor
+            fn setup(driver: D) -> JoyConResult<D>;
+
+            /// Construct instance simply. Your implementation will be ->
+            /// ```ignore
+            /// fn construct(driver: SimpleJoyConDriver) -> Self::Mode{
+            ///     SimpleJoyConDriver { driver }
+            /// }
+            /// ```
+            fn construct(driver: D) -> Self::Mode;
+        }
+
+        /// - M: Actual Mode
+        /// - D: JoyCon Driver
+        /// - EXR: Actual Mode's Extra Report
+        impl<M, D, EXR> InputReportMode<D> for M
+            where M: StandardInputReportMode<D, ExtraReport=EXR>,
+                  D: JoyConDriver,
+                  EXR: TryFrom<[u8; 349], Error=JoyConError>
+        {
+            type Mode = M::Mode;
+            type Report = StandardInputReport<EXR>;
+
+            fn set(driver: D) -> JoyConResult<Self::Mode> {
+                let mut driver = M::setup(driver)?;
+
+                driver.send_sub_command(M::SUB_COMMAND, M::ARGS.as_ref())?;
+
+                Ok(M::construct(driver))
+            }
+
+            fn read_input_report(&self) -> JoyConResult<Self::Report> {
+                let mut buf = [0u8; 362];
+                self.read(&mut buf)?;
+
+                Self::Report::try_from(buf)
+            }
+        }
+
+        mod sub_command_mode {
             use super::*;
 
             /// Joy-Con emitting standard input report with sub-command reply
