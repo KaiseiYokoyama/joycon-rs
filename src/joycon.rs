@@ -1060,11 +1060,14 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> InputReportMode<D> for StandardFullMode<D> {
+            impl<D: JoyConDriver> StandardInputReportMode<D> for StandardFullMode<D> {
+                const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
+                const ARGS: Self::ArgsType = [0x30];
+                type ArgsType = [u8; 1];
                 type Mode = StandardFullMode<D>;
-                type Report = StandardInputReport<IMUData>;
+                type ExtraReport = IMUData;
 
-                fn set(driver: D) -> JoyConResult<Self::Mode> {
+                fn setup(driver: D) -> JoyConResult<D> {
                     let mut driver = driver;
                     // enable IMU(6-Axis sensor)
                     let imf_enabled = driver.enabled_features()
@@ -1076,18 +1079,12 @@ mod driver {
                     if !imf_enabled {
                         driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
                     }
-                    // set input report mode to standard full mode
-                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x30])?;
 
-                    Ok(StandardFullMode { driver })
+                    Ok(driver)
                 }
 
-                fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                    // read
-                    let mut buf = [0x00; 362];
-                    self.read(&mut buf)?;
-                    // convert
-                    Self::Report::try_from(buf)
+                fn construct(driver: D) -> Self::Mode {
+                    StandardFullMode { driver }
                 }
             }
         }
