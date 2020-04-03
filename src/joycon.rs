@@ -721,6 +721,7 @@ mod driver {
             // }
         }
 
+        /// Standard Input Report
         pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
             common: CommonReport,
             extra: EX,
@@ -813,31 +814,28 @@ mod driver {
 
         mod sub_command_mode {
             use super::*;
+            use std::marker::PhantomData;
 
-            /// Joy-Con emitting standard input report with sub-command reply
-            pub struct SubCommandMode<D: JoyConDriver> {
-                driver: D
+            // todo write docs
+            pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
+                type ArgsType: AsRef<[u8]>;
+                const SUB_COMMAND: SubCommand;
+                const ARGS: Self::ArgsType;
             }
 
+            /// Replies to sub-commands
             #[derive(Clone)]
-            pub struct SubCommandReply {
+            pub struct SubCommandReport<RD>
+                where RD: SubCommandReplyData
+            {
                 ack_byte: u8,
                 sub_command_id: u8,
-                reply: [u8; 35],
+                reply: RD,
             }
 
-            impl Debug for SubCommandReply {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f,
-                           "SubCommandReply {{ ack_byte: {}, sub_command_id: {}, reply: [{}] }}",
-                           self.ack_byte,
-                           self.sub_command_id,
-                           self.reply.iter().map(|&u| u as char).collect::<String>()
-                    )
-                }
-            }
-
-            impl TryFrom<[u8; 349]> for SubCommandReply {
+            impl<RD> TryFrom<[u8; 349]> for SubCommandReport<RD>
+                where RD: SubCommandReplyData
+            {
                 type Error = JoyConError;
 
                 fn try_from(value: [u8; 349]) -> Result<Self, Self::Error> {
@@ -845,8 +843,9 @@ mod driver {
                     let sub_command_id = value[1];
                     let mut reply = [0x00; 35];
                     reply.copy_from_slice(&value[2..37]);
+                    let reply = RD::try_from(reply)?;
 
-                    Ok(SubCommandReply {
+                    Ok(SubCommandReport {
                         ack_byte,
                         sub_command_id,
                         reply,
@@ -854,28 +853,17 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> InputReportMode<D> for SubCommandMode<D> {
-                type Mode = SubCommandMode<D>;
-                type Report = StandardInputReport<SubCommandReply>;
-
-                fn set(driver: D) -> JoyConResult<Self::Mode> {
-                    let mut driver = driver;
-                    // set input report mode to sub command mode
-                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x21])?;
-
-                    Ok(SubCommandMode { driver })
-                }
-
-                fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                    // read
-                    let mut buf = [0x00; 362];
-                    self.read(&mut buf)?;
-                    // convert
-                    Self::Report::try_from(buf)
-                }
+            pub struct SubCommandMode<D, RD>
+                where D: JoyConDriver, RD: SubCommandReplyData
+            {
+                driver: D,
+                _phantom: PhantomData<RD>,
             }
 
-            impl<D: JoyConDriver> Deref for SubCommandMode<D> {
+            impl<D, RD> Deref for SubCommandMode<D, RD>
+                where D: JoyConDriver,
+                      RD: SubCommandReplyData
+            {
                 type Target = D;
 
                 fn deref(&self) -> &Self::Target {
@@ -883,9 +871,35 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> DerefMut for SubCommandMode<D> {
+            impl<D, RD> DerefMut for SubCommandMode<D, RD>
+                where D: JoyConDriver,
+                      RD: SubCommandReplyData
+            {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.driver
+                }
+            }
+
+            impl<D, RD> StandardInputReportMode<D> for SubCommandMode<D, RD>
+                where D: JoyConDriver,
+                      RD: SubCommandReplyData
+            {
+                const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
+                const ARGS: Self::ArgsType = RD::ARGS;
+                type ArgsType = RD::ArgsType;
+                type Mode = SubCommandMode<D, RD>;
+                type ExtraReport = SubCommandReport<RD>;
+
+                fn setup(driver: D) -> JoyConResult<D> {
+                    // do nothing
+                    Ok(driver)
+                }
+
+                fn construct(driver: D) -> Self::Mode {
+                    SubCommandMode {
+                        driver,
+                        _phantom: PhantomData,
+                    }
                 }
             }
         }
