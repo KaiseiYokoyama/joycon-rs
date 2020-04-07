@@ -1046,7 +1046,9 @@ mod driver {
                 driver: D,
             }
 
-            impl<D: JoyConDriver> Deref for StandardFullMode<D> {
+            impl<D> Deref for StandardFullMode<D>
+                where D: JoyConDriver
+            {
                 type Target = D;
 
                 fn deref(&self) -> &Self::Target {
@@ -1054,13 +1056,17 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> DerefMut for StandardFullMode<D> {
+            impl<D> DerefMut for StandardFullMode<D>
+                where D: JoyConDriver
+            {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.driver
                 }
             }
 
-            impl<D: JoyConDriver> StandardInputReportMode<D> for StandardFullMode<D> {
+            impl<D: JoyConDriver> StandardInputReportMode<D> for StandardFullMode<D>
+                where D: JoyConDriver
+            {
                 const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
                 const ARGS: Self::ArgsType = [0x30];
                 type ArgsType = [u8; 1];
