@@ -705,22 +705,44 @@ mod driver {
 
         pub trait InputReportMode<D: JoyConDriver>: Deref<Target=D> + DerefMut<Target=D> {
             type Mode: InputReportMode<D>;
-            type Report;
+            type Report: TryFrom<[u8; 362], Error=JoyConError>;
+            type ArgsType: AsRef<[u8]>;
+
+            const SUB_COMMAND: SubCommand;
+            const ARGS: Self::ArgsType;
+
+            /// Mode's setup operation.
+            /// ex. Enable 6-Axis sensor
+            /// note: There are no needs to change Joy-Con's input report mode, leave it to `InputReportMode<D>::new()`.
+            fn setup(driver: D) -> JoyConResult<D>;
+
+            /// Construct instance simply. Typically, your implementation will be ->
+            /// ```ignore
+            /// fn construct(driver: D) -> Self::Mode {
+            ///     Self::Mode { driver }
+            /// }
+            /// ```
+            fn construct(driver: D) -> Self::Mode;
 
             /// set Joy-Con's input report mode and return instance
-            fn set(driver: D) -> JoyConResult<Self::Mode>;
+            fn new(driver: D) -> JoyConResult<Self::Mode> {
+                let mut driver = Self::Mode::setup(driver)?;
+
+                driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
+
+                Ok(Self::construct(driver))
+            }
 
             /// read Joy-Con's input report
-            fn read_input_report(&self) -> JoyConResult<Self::Report>;
-            // {
-            //     // read
-            //     let mut buf = [0x00; 362];
-            //     self.read(&mut buf)?;
-            //     // convert
-            //     Self::Report::try_from(buf)
-            // }
+            fn read_input_report(&self) -> JoyConResult<Self::Report> {
+                let mut buf = [0u8; 362];
+                self.read(&mut buf)?;
+
+                Self::Report::try_from(buf)
+            }
         }
 
+        /// Standard Input Report
         pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
             common: CommonReport,
             extra: EX,
@@ -762,33 +784,30 @@ mod driver {
             }
         }
 
-        pub mod sub_command_mode {
+        mod sub_command_mode {
             use super::*;
+            use std::marker::PhantomData;
 
-            /// Joy-Con emitting standard input report with sub-command reply
-            pub struct SubCommandMode<D: JoyConDriver> {
-                driver: D
+            // todo write docs
+            pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
+                type ArgsType: AsRef<[u8]>;
+                const SUB_COMMAND: SubCommand;
+                const ARGS: Self::ArgsType;
             }
 
+            /// Replies to sub-commands
             #[derive(Clone)]
-            pub struct SubCommandReply {
+            pub struct SubCommandReport<RD>
+                where RD: SubCommandReplyData
+            {
                 ack_byte: u8,
                 sub_command_id: u8,
-                reply: [u8; 35],
+                reply: RD,
             }
 
-            impl Debug for SubCommandReply {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f,
-                           "SubCommandReply {{ ack_byte: {}, sub_command_id: {}, reply: [{}] }}",
-                           self.ack_byte,
-                           self.sub_command_id,
-                           self.reply.iter().map(|&u| u as char).collect::<String>()
-                    )
-                }
-            }
-
-            impl TryFrom<[u8; 349]> for SubCommandReply {
+            impl<RD> TryFrom<[u8; 349]> for SubCommandReport<RD>
+                where RD: SubCommandReplyData
+            {
                 type Error = JoyConError;
 
                 fn try_from(value: [u8; 349]) -> Result<Self, Self::Error> {
@@ -796,8 +815,9 @@ mod driver {
                     let sub_command_id = value[1];
                     let mut reply = [0x00; 35];
                     reply.copy_from_slice(&value[2..37]);
+                    let reply = RD::try_from(reply)?;
 
-                    Ok(SubCommandReply {
+                    Ok(SubCommandReport {
                         ack_byte,
                         sub_command_id,
                         reply,
@@ -805,28 +825,17 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> InputReportMode<D> for SubCommandMode<D> {
-                type Mode = SubCommandMode<D>;
-                type Report = StandardInputReport<SubCommandReply>;
-
-                fn set(driver: D) -> JoyConResult<Self::Mode> {
-                    let mut driver = driver;
-                    // set input report mode to sub command mode
-                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x21])?;
-
-                    Ok(SubCommandMode { driver })
-                }
-
-                fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                    // read
-                    let mut buf = [0x00; 362];
-                    self.read(&mut buf)?;
-                    // convert
-                    Self::Report::try_from(buf)
-                }
+            pub struct SubCommandMode<D, RD>
+                where D: JoyConDriver, RD: SubCommandReplyData
+            {
+                driver: D,
+                _phantom: PhantomData<RD>,
             }
 
-            impl<D: JoyConDriver> Deref for SubCommandMode<D> {
+            impl<D, RD> Deref for SubCommandMode<D, RD>
+                where D: JoyConDriver,
+                      RD: SubCommandReplyData
+            {
                 type Target = D;
 
                 fn deref(&self) -> &Self::Target {
@@ -834,11 +843,60 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> DerefMut for SubCommandMode<D> {
+            impl<D, RD> DerefMut for SubCommandMode<D, RD>
+                where D: JoyConDriver,
+                      RD: SubCommandReplyData
+            {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.driver
                 }
             }
+
+            impl<D, RD> InputReportMode<D> for SubCommandMode<D, RD>
+                where D: JoyConDriver,
+                      RD: SubCommandReplyData
+            {
+                type Mode = SubCommandMode<D, RD>;
+                type Report = StandardInputReport<SubCommandReport<RD>>;
+                type ArgsType = RD::ArgsType;
+                const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
+                const ARGS: Self::ArgsType = RD::ARGS;
+
+                fn setup(driver: D) -> JoyConResult<D> {
+                    // do nothing
+                    Ok(driver)
+                }
+
+                fn construct(driver: D) -> Self::Mode {
+                    SubCommandMode {
+                        driver,
+                        _phantom: PhantomData,
+                    }
+                }
+            }
+
+            // impl<D, RD> StandardInputReportMode<D> for SubCommandMode<D, RD>
+            //     where D: JoyConDriver,
+            //           RD: SubCommandReplyData
+            // {
+            //     const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
+            //     const ARGS: Self::ArgsType = RD::ARGS;
+            //     type ArgsType = RD::ArgsType;
+            //     type Mode = SubCommandMode<D, RD>;
+            //     type ExtraReport = SubCommandReport<RD>;
+            //
+            //     fn setup(driver: D) -> JoyConResult<D> {
+            //         // do nothing
+            //         Ok(driver)
+            //     }
+            //
+            //     fn construct(driver: D) -> Self::Mode {
+            //         SubCommandMode {
+            //             driver,
+            //             _phantom: PhantomData,
+            //         }
+            //     }
+            // }
         }
 
         pub mod standard_full_mode {
@@ -887,7 +945,9 @@ mod driver {
                 driver: D,
             }
 
-            impl<D: JoyConDriver> Deref for StandardFullMode<D> {
+            impl<D> Deref for StandardFullMode<D>
+                where D: JoyConDriver
+            {
                 type Target = D;
 
                 fn deref(&self) -> &Self::Target {
@@ -895,17 +955,24 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> DerefMut for StandardFullMode<D> {
+            impl<D> DerefMut for StandardFullMode<D>
+                where D: JoyConDriver
+            {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.driver
                 }
             }
 
-            impl<D: JoyConDriver> InputReportMode<D> for StandardFullMode<D> {
+            impl<D> InputReportMode<D> for StandardFullMode<D>
+                where D: JoyConDriver
+            {
                 type Mode = StandardFullMode<D>;
                 type Report = StandardInputReport<IMUData>;
+                type ArgsType = [u8; 1];
+                const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
+                const ARGS: Self::ArgsType = [0x30];
 
-                fn set(driver: D) -> JoyConResult<Self::Mode> {
+                fn setup(driver: D) -> JoyConResult<D> {
                     let mut driver = driver;
                     // enable IMU(6-Axis sensor)
                     let imf_enabled = driver.enabled_features()
@@ -917,20 +984,46 @@ mod driver {
                     if !imf_enabled {
                         driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
                     }
-                    // set input report mode to standard full mode
-                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x30])?;
 
-                    Ok(StandardFullMode { driver })
+                    Ok(driver)
                 }
 
-                fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                    // read
-                    let mut buf = [0x00; 362];
-                    self.read(&mut buf)?;
-                    // convert
-                    Self::Report::try_from(buf)
+                fn construct(driver: D) -> Self::Mode {
+                    Self::Mode {
+                        driver
+                    }
                 }
             }
+
+            // impl<D: JoyConDriver> StandardInputReportMode<D> for StandardFullMode<D>
+            //     where D: JoyConDriver
+            // {
+            //     const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
+            //     const ARGS: Self::ArgsType = [0x30];
+            //     type ArgsType = [u8; 1];
+            //     type Mode = StandardFullMode<D>;
+            //     type ExtraReport = IMUData;
+            //
+            //     fn setup(driver: D) -> JoyConResult<D> {
+            //         let mut driver = driver;
+            //         // enable IMU(6-Axis sensor)
+            //         let imf_enabled = driver.enabled_features()
+            //             .iter()
+            //             .any(|jf| match jf {
+            //                 JoyConFeatures::IMUFeature(_) => true,
+            //                 _ => false,
+            //             });
+            //         if !imf_enabled {
+            //             driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
+            //         }
+            //
+            //         Ok(driver)
+            //     }
+            //
+            //     fn construct(driver: D) -> Self::Mode {
+            //         StandardFullMode { driver }
+            //     }
+            // }
         }
 
         pub mod simple_hid_mode {
@@ -1003,14 +1096,14 @@ mod driver {
 
             /// Pushed buttons and stick direction.
             #[derive(Debug, Clone)]
-            pub struct SimpleHIDUpdate {
+            pub struct SimpleHIDReport {
                 pub input_report_id: u8,
                 pub pushed_buttons: Vec<SimpleHIDButton>,
                 pub stick_direction: StickDirection,
                 pub filter_data: [u8; 8],
             }
 
-            impl TryFrom<[u8; 12]> for SimpleHIDUpdate {
+            impl TryFrom<[u8; 12]> for SimpleHIDReport {
                 type Error = JoyConError;
 
                 fn try_from(value: [u8; 12]) -> Result<Self, Self::Error> {
@@ -1047,12 +1140,23 @@ mod driver {
                         buf
                     };
 
-                    Ok(SimpleHIDUpdate {
+                    Ok(SimpleHIDReport {
                         input_report_id,
                         pushed_buttons,
                         stick_direction,
                         filter_data,
                     })
+                }
+            }
+
+            impl TryFrom<[u8; 362]> for SimpleHIDReport {
+                type Error = JoyConError;
+
+                fn try_from(value: [u8; 362]) -> Result<Self, Self::Error> {
+                    let mut buf = [0u8; 12];
+                    buf.copy_from_slice(&value[0..12]);
+
+                    Self::try_from(buf)
                 }
             }
 
@@ -1074,26 +1178,54 @@ mod driver {
                 }
             }
 
-            impl<D: JoyConDriver> InputReportMode<D> for SimpleHIDMode<D> {
+            // impl<D: JoyConDriver> SimpleHIDMode<D> {
+            //     fn simple(&self, driver: D) {
+            //         let mode = Self::construct(driver);
+            //         unimplemented!()
+            //     }
+            // }
+
+            impl<D> InputReportMode<D> for SimpleHIDMode<D>
+                where D: JoyConDriver
+            {
                 type Mode = SimpleHIDMode<D>;
-                type Report = SimpleHIDUpdate;
+                type Report = SimpleHIDReport;
+                type ArgsType = [u8; 1];
+                const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
+                const ARGS: Self::ArgsType = [0x3F];
 
-                fn set(driver: D) -> JoyConResult<Self::Mode> {
-                    let mut driver = driver;
-                    // set input report mode to simple hid mode
-                    driver.send_sub_command(SubCommand::SetInputReportMode, &[0x3F])?;
-
-                    Ok(SimpleHIDMode { driver })
+                fn setup(driver: D) -> JoyConResult<D> {
+                    // do nothing
+                    Ok(driver)
                 }
 
-                fn read_input_report(&self) -> JoyConResult<Self::Report> {
-                    // read
-                    let mut buf = [0x00; 12];
-                    self.read(&mut buf)?;
-                    // convert
-                    Self::Report::try_from(buf)
+                fn construct(driver: D) -> Self::Mode {
+                    Self::Mode {
+                        driver
+                    }
                 }
             }
+
+            // impl<D: JoyConDriver> InputReportMode<D> for SimpleHIDMode<D> {
+            //     type Mode = SimpleHIDMode<D>;
+            //     type Report = SimpleHIDUpdate;
+            //
+            //     fn new(driver: D) -> JoyConResult<Self::Mode> {
+            //         let mut driver = driver;
+            //         // set input report mode to simple hid mode
+            //         driver.send_sub_command(SubCommand::SetInputReportMode, &[0x3F])?;
+            //
+            //         Ok(SimpleHIDMode { driver })
+            //     }
+            //
+            //     fn read_input_report(&self) -> JoyConResult<Self::Report> {
+            //         // read
+            //         let mut buf = [0x00; 12];
+            //         self.read(&mut buf)?;
+            //         // convert
+            //         Self::Report::try_from(buf)
+            //     }
+            // }
         }
     }
 
