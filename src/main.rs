@@ -21,11 +21,11 @@ fn main() -> JoyConResult<()> {
             std::thread::spawn(move || {
                 // driver.set_lights(&vec![SimpleJoyConDriver::LIGHT_UP[idx % SimpleJoyConDriver::LIGHT_UP.len()]], &vec![]).unwrap();
                 driver.set_lights(&vec![], &vec![SimpleJoyConDriver::FLASH[0]]).unwrap();
+                let mode = driver.light_report_mode().unwrap();
                 loop {
                     // every seconds, get lights status
                     std::thread::sleep(std::time::Duration::from_secs(1));
-                    let lights = driver.get_lights();
-                    sender.send(lights);
+                    sender.send(mode.read_input_report());
                 }
                 // enable 6-axis sensor
                 // let simple_hid_mode = SimpleHIDMode::set(driver).unwrap();

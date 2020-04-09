@@ -784,9 +784,10 @@ mod driver {
             }
         }
 
-        mod sub_command_mode {
+        pub mod sub_command_mode {
             use super::*;
             use std::marker::PhantomData;
+            use std::fmt::Error;
 
             // todo write docs
             pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
@@ -803,6 +804,23 @@ mod driver {
                 ack_byte: u8,
                 sub_command_id: u8,
                 reply: RD,
+            }
+
+            impl<RD> Debug for SubCommandReport<RD>
+                where RD: SubCommandReplyData + Debug
+            {
+                fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                    write!(f,
+                           "SubCommandReport {{\
+                                    \n\t ack_byte: {},
+                                    \n\t sub_command_id: {},
+                                    \n\t reply: {:?},
+                           }}",
+                           self.ack_byte,
+                           self.sub_command_id,
+                           &self.reply
+                    )
+                }
             }
 
             impl<RD> TryFrom<[u8; 349]> for SubCommandReport<RD>
@@ -874,29 +892,6 @@ mod driver {
                     }
                 }
             }
-
-            // impl<D, RD> StandardInputReportMode<D> for SubCommandMode<D, RD>
-            //     where D: JoyConDriver,
-            //           RD: SubCommandReplyData
-            // {
-            //     const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
-            //     const ARGS: Self::ArgsType = RD::ARGS;
-            //     type ArgsType = RD::ArgsType;
-            //     type Mode = SubCommandMode<D, RD>;
-            //     type ExtraReport = SubCommandReport<RD>;
-            //
-            //     fn setup(driver: D) -> JoyConResult<D> {
-            //         // do nothing
-            //         Ok(driver)
-            //     }
-            //
-            //     fn construct(driver: D) -> Self::Mode {
-            //         SubCommandMode {
-            //             driver,
-            //             _phantom: PhantomData,
-            //         }
-            //     }
-            // }
         }
 
         pub mod standard_full_mode {
@@ -994,36 +989,6 @@ mod driver {
                     }
                 }
             }
-
-            // impl<D: JoyConDriver> StandardInputReportMode<D> for StandardFullMode<D>
-            //     where D: JoyConDriver
-            // {
-            //     const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
-            //     const ARGS: Self::ArgsType = [0x30];
-            //     type ArgsType = [u8; 1];
-            //     type Mode = StandardFullMode<D>;
-            //     type ExtraReport = IMUData;
-            //
-            //     fn setup(driver: D) -> JoyConResult<D> {
-            //         let mut driver = driver;
-            //         // enable IMU(6-Axis sensor)
-            //         let imf_enabled = driver.enabled_features()
-            //             .iter()
-            //             .any(|jf| match jf {
-            //                 JoyConFeatures::IMUFeature(_) => true,
-            //                 _ => false,
-            //             });
-            //         if !imf_enabled {
-            //             driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
-            //         }
-            //
-            //         Ok(driver)
-            //     }
-            //
-            //     fn construct(driver: D) -> Self::Mode {
-            //         StandardFullMode { driver }
-            //     }
-            // }
         }
 
         pub mod simple_hid_mode {
@@ -1178,13 +1143,6 @@ mod driver {
                 }
             }
 
-            // impl<D: JoyConDriver> SimpleHIDMode<D> {
-            //     fn simple(&self, driver: D) {
-            //         let mode = Self::construct(driver);
-            //         unimplemented!()
-            //     }
-            // }
-
             impl<D> InputReportMode<D> for SimpleHIDMode<D>
                 where D: JoyConDriver
             {
@@ -1205,32 +1163,12 @@ mod driver {
                     }
                 }
             }
-
-            // impl<D: JoyConDriver> InputReportMode<D> for SimpleHIDMode<D> {
-            //     type Mode = SimpleHIDMode<D>;
-            //     type Report = SimpleHIDUpdate;
-            //
-            //     fn new(driver: D) -> JoyConResult<Self::Mode> {
-            //         let mut driver = driver;
-            //         // set input report mode to simple hid mode
-            //         driver.send_sub_command(SubCommand::SetInputReportMode, &[0x3F])?;
-            //
-            //         Ok(SimpleHIDMode { driver })
-            //     }
-            //
-            //     fn read_input_report(&self) -> JoyConResult<Self::Report> {
-            //         // read
-            //         let mut buf = [0x00; 12];
-            //         self.read(&mut buf)?;
-            //         // convert
-            //         Self::Report::try_from(buf)
-            //     }
-            // }
         }
     }
 
     pub mod lights {
-        use super::*;
+        use super::{*, input_report_mode::{InputReportMode, sub_command_mode::*}};
+        use std::convert::TryFrom;
 
         /// LED to keep on lightning up / lightning
         #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -1258,11 +1196,53 @@ mod driver {
             LED3 = 0x80,
         }
 
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct LightsStatus {
+            light_up: Vec<LightUp>,
+            flash: Vec<Flash>,
+        }
+
+        const LIGHT_UP: [LightUp; 4] =
+            [LightUp::LED0, LightUp::LED1, LightUp::LED2, LightUp::LED3];
+        const FLASH: [Flash; 4] =
+            [Flash::LED0, Flash::LED1, Flash::LED2, Flash::LED3];
+
+        impl TryFrom<[u8; 35]> for LightsStatus {
+            type Error = JoyConError;
+
+            fn try_from(value: [u8; 35]) -> Result<Self, Self::Error> {
+                let value = value[0];
+
+                // parse reply
+                let light_up = LIGHT_UP.iter()
+                    .filter(|&&l| {
+                        let light = l as u8;
+                        value & light == light
+                    })
+                    .cloned()
+                    .collect();
+                let flash = FLASH.iter()
+                    .filter(|&&f| {
+                        let flash = f as u8;
+                        value & flash == flash
+                    })
+                    .cloned()
+                    .collect();
+
+                Ok(LightsStatus { light_up, flash })
+            }
+        }
+
+        impl SubCommandReplyData for LightsStatus {
+            type ArgsType = [u8; 0];
+            const SUB_COMMAND: SubCommand = SubCommand::GetPlayerLights;
+            const ARGS: Self::ArgsType = [];
+        }
+
         pub trait Lights: JoyConDriver {
-            const LIGHT_UP: [LightUp; 4] =
-                [LightUp::LED0, LightUp::LED1, LightUp::LED2, LightUp::LED3];
-            const FLASH: [Flash; 4] =
-                [Flash::LED0, Flash::LED1, Flash::LED2, Flash::LED3];
+            const LIGHT_UP: [LightUp; 4] = LIGHT_UP;
+            const FLASH: [Flash; 4] = FLASH;
+
             /// light up or flash LEDs on controller, vice versa.
             fn set_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<usize> {
                 let arg = light_up.iter()
@@ -1276,33 +1256,10 @@ mod driver {
             }
 
             /// Get status of LEDs on controller
-            fn get_lights(&mut self) -> JoyConResult<(Vec<LightUp>, Vec<Flash>)> {
-                self.send_sub_command(SubCommand::GetPlayerLights, &[])?;
-
-                // read reply
-                let mut buf = [0; 16];
-                // Joy-Con send standard input report with sub-command reply
-                self.read(&mut buf)?;
-                let value = buf[15];
-
-
-                // parse reply
-                let light_up = Self::LIGHT_UP.iter()
-                    .filter(|&&l| {
-                        let light = l as u8;
-                        value & light == light
-                    })
-                    .cloned()
-                    .collect();
-                let flash = Self::FLASH.iter()
-                    .filter(|&&f| {
-                        let flash = f as u8;
-                        value & flash == flash
-                    })
-                    .cloned()
-                    .collect();
-
-                Ok((light_up, flash))
+            fn light_report_mode(self) -> JoyConResult<SubCommandMode<Self, LightsStatus>>
+                where Self: std::marker::Sized
+            {
+                SubCommandMode::new(self)
             }
         }
 
