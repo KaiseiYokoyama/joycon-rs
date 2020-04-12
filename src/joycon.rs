@@ -511,6 +511,7 @@ mod driver {
             use super::*;
             use std::convert::TryFrom;
 
+            /// Battery level
             #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
             pub enum BatteryLevel {
                 Empty,
@@ -520,6 +521,7 @@ mod driver {
                 Full,
             }
 
+            /// Battery info
             #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
             pub struct Battery {
                 pub level: BatteryLevel,
@@ -547,12 +549,14 @@ mod driver {
                 }
             }
 
+            /// Device info
             #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
             pub enum Device {
                 JoyCon,
                 ProConOrChargingGrip,
             }
 
+            /// Connection info
             #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
             pub struct ConnectionInfo {
                 device: Device,
@@ -577,6 +581,7 @@ mod driver {
                 }
             }
 
+            /// Button status
             #[derive(Debug, Clone, Hash, Eq, PartialEq)]
             pub struct PushedButtons {
                 right: Vec<Buttons>,
@@ -657,6 +662,7 @@ mod driver {
                 }
             }
 
+            /// Analog stick data
             #[derive(Debug, Clone, Hash, Eq, PartialEq)]
             pub struct AnalogStickData {
                 horizontal: u16,
@@ -671,43 +677,6 @@ mod driver {
                     Self {
                         horizontal,
                         vertical,
-                    }
-                }
-            }
-
-            #[derive(Debug, Clone, Copy, PartialEq)]
-            pub struct AxisData {
-                /// Acceleration to X measured
-                pub accel_x: i16,
-                /// Acceleration to Y measured
-                pub accel_y: i16,
-                /// Acceleration to Z measured
-                pub accel_z: i16,
-                /// Rotation of X measured
-                pub gyro_1: i16,
-                /// Rotation of Y measured
-                pub gyro_2: i16,
-                /// Rotation of Z measured
-                pub gyro_3: i16,
-            }
-
-            impl From<[u8; 12]> for AxisData {
-                fn from(value: [u8; 12]) -> Self {
-                    let accel_x = i16::from_le_bytes([value[0], value[1]]);
-                    let accel_y = i16::from_le_bytes([value[2], value[3]]);
-                    let accel_z = i16::from_le_bytes([value[4], value[5]]);
-
-                    let gyro_1 = i16::from_le_bytes([value[6], value[7]]);
-                    let gyro_2 = i16::from_le_bytes([value[8], value[9]]);
-                    let gyro_3 = i16::from_le_bytes([value[10], value[11]]);
-
-                    AxisData {
-                        accel_x,
-                        accel_y,
-                        accel_z,
-                        gyro_1,
-                        gyro_2,
-                        gyro_3,
                     }
                 }
             }
@@ -995,6 +964,44 @@ mod driver {
 
         pub mod standard_full_mode {
             use super::*;
+
+            /// IMU(6-Axis sensor)'s value.
+            #[derive(Debug, Clone, Copy, PartialEq)]
+            pub struct AxisData {
+                /// Acceleration to X measured
+                pub accel_x: i16,
+                /// Acceleration to Y measured
+                pub accel_y: i16,
+                /// Acceleration to Z measured
+                pub accel_z: i16,
+                /// Rotation of X measured
+                pub gyro_1: i16,
+                /// Rotation of Y measured
+                pub gyro_2: i16,
+                /// Rotation of Z measured
+                pub gyro_3: i16,
+            }
+
+            impl From<[u8; 12]> for AxisData {
+                fn from(value: [u8; 12]) -> Self {
+                    let accel_x = i16::from_le_bytes([value[0], value[1]]);
+                    let accel_y = i16::from_le_bytes([value[2], value[3]]);
+                    let accel_z = i16::from_le_bytes([value[4], value[5]]);
+
+                    let gyro_1 = i16::from_le_bytes([value[6], value[7]]);
+                    let gyro_2 = i16::from_le_bytes([value[8], value[9]]);
+                    let gyro_3 = i16::from_le_bytes([value[10], value[11]]);
+
+                    AxisData {
+                        accel_x,
+                        accel_y,
+                        accel_z,
+                        gyro_1,
+                        gyro_2,
+                        gyro_3,
+                    }
+                }
+            }
 
             /// 6-Axis data. 3 frames of 2 groups of 3 Int16LE each. Group is Acc followed by Gyro.
             #[derive(Debug, Clone)]
