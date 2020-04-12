@@ -111,9 +111,9 @@ mod joycon_device {
 
 mod driver {
     use super::*;
+    use std::collections::HashSet;
     pub use global_packet_number::GlobalPacketNumber;
     pub use joycon_features::{JoyConFeatures, IMUFeature};
-    use std::collections::HashSet;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Rotation {
@@ -318,6 +318,9 @@ mod driver {
 
     impl SimpleJoyConDriver {
         pub fn new(joycon: JoyConDevice) -> JoyConResult<Self> {
+            // joycon.set_blocking_mode(true);
+            // joycon.set_blocking_mode(false);
+
             let mut driver = Self {
                 joycon,
                 rotation: Rotation::Portrait,
@@ -340,7 +343,9 @@ mod driver {
 
         fn increase_global_packet_number(&mut self);
 
-        fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<usize> {
+        fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
+            use input_report_mode::sub_command_mode::AckByte;
+
             let mut buf = [0x0; 0x40];
             // set command
             buf[0] = command;
@@ -354,21 +359,36 @@ mod driver {
             // set data
             buf[11..11 + data.len()].copy_from_slice(data);
 
-            self.write(&buf)
+            // send command
+            self.write(&buf)?;
+
+            // check reply
+            let mut buf = [0u8; 362];
+            self.read(&mut buf)?;
+            let ack_byte = AckByte::from(buf[13]);
+
+            match ack_byte {
+                AckByte::Ack { .. } => {
+                    Ok(buf)
+                }
+                AckByte::Nack => {
+                    Err(JoyConError::SubCommandError(sub_command))
+                }
+            }
         }
 
-        fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<usize> {
+        fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
             self.send_command_raw(1, sub_command, data)
         }
 
-        fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
+        fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
             let command = command as u8;
             let sub_command = sub_command as u8;
 
             self.send_command_raw(command, sub_command, data)
         }
 
-        fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
+        fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
             self.send_command(Command::RumbleAndSubCommand, sub_command, data)
         }
 
@@ -787,13 +807,41 @@ mod driver {
         pub mod sub_command_mode {
             use super::*;
             use std::marker::PhantomData;
-            use std::fmt::Error;
+
+            #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+            pub enum AckByte {
+                Ack {
+                    data_type: u8
+                },
+                Nack,
+            }
+
+            impl From<u8> for AckByte {
+                fn from(u: u8) -> Self {
+                    if u >> 7 == 1 {
+                        AckByte::Ack {
+                            data_type: u & 0x7F
+                        }
+                    } else {
+                        AckByte::Nack
+                    }
+                }
+            }
 
             // todo write docs
             pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
                 type ArgsType: AsRef<[u8]>;
                 const SUB_COMMAND: SubCommand;
                 const ARGS: Self::ArgsType;
+
+                /// The mode remains the same, sending commands and receiving replies.
+                fn once<D>(driver: &mut D) -> JoyConResult<StandardInputReport<SubCommandReport<Self>>>
+                    where Self: std::marker::Sized,
+                          D: JoyConDriver
+                {
+                    let reply = driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
+                    StandardInputReport::try_from(reply)
+                }
             }
 
             /// Replies to sub-commands
@@ -801,7 +849,7 @@ mod driver {
             pub struct SubCommandReport<RD>
                 where RD: SubCommandReplyData
             {
-                ack_byte: u8,
+                ack_byte: AckByte,
                 sub_command_id: u8,
                 reply: RD,
             }
@@ -812,7 +860,7 @@ mod driver {
                 fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                     write!(f,
                            "SubCommandReport {{\
-                                    \n\t ack_byte: {},
+                                    \n\t ack_byte: {:?},
                                     \n\t sub_command_id: {},
                                     \n\t reply: {:?},
                            }}",
@@ -829,7 +877,7 @@ mod driver {
                 type Error = JoyConError;
 
                 fn try_from(value: [u8; 349]) -> Result<Self, Self::Error> {
-                    let ack_byte = value[0];
+                    let ack_byte = AckByte::from(value[0]);
                     let sub_command_id = value[1];
                     let mut reply = [0x00; 35];
                     reply.copy_from_slice(&value[2..37]);
@@ -876,12 +924,17 @@ mod driver {
             {
                 type Mode = SubCommandMode<D, RD>;
                 type Report = StandardInputReport<SubCommandReport<RD>>;
+                // type ArgsType = [u8; 1];
+                // const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
+                // const ARGS: Self::ArgsType = [0x21];
                 type ArgsType = RD::ArgsType;
                 const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
                 const ARGS: Self::ArgsType = RD::ARGS;
 
                 fn setup(driver: D) -> JoyConResult<D> {
-                    // do nothing
+                    // let mut driver = driver;
+                    // driver.send_sub_command(RD::SUB_COMMAND, RD::ARGS.as_ref())?;
+
                     Ok(driver)
                 }
 
@@ -1167,8 +1220,9 @@ mod driver {
     }
 
     pub mod lights {
-        use super::{*, input_report_mode::{InputReportMode, sub_command_mode::*}};
+        use super::{*, input_report_mode:: sub_command_mode::*};
         use std::convert::TryFrom;
+        use crate::joycon::driver::input_report_mode::StandardInputReport;
 
         /// LED to keep on lightning up / lightning
         #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -1244,7 +1298,7 @@ mod driver {
             const FLASH: [Flash; 4] = FLASH;
 
             /// light up or flash LEDs on controller, vice versa.
-            fn set_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<usize> {
+            fn set_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<[u8; 362]> {
                 let arg = light_up.iter()
                     .map(|&lu| lu as u8)
                     .sum::<u8>()
@@ -1252,14 +1306,24 @@ mod driver {
                     .map(|&f| f as u8)
                     .sum::<u8>();
 
-                self.send_sub_command(SubCommand::SetPlayerLights, &[arg])
+                let reply = self.send_sub_command(SubCommand::SetPlayerLights, &[arg])?;
+                let ack_byte = reply[13];
+
+                match AckByte::from(ack_byte) {
+                    AckByte::Ack { .. } => {
+                        Ok(reply)
+                    }
+                    AckByte::Nack => {
+                        Err(JoyConError::SubCommandError(SubCommand::SetPlayerLights as u8))
+                    }
+                }
             }
 
             /// Get status of LEDs on controller
-            fn light_report_mode(self) -> JoyConResult<SubCommandMode<Self, LightsStatus>>
+            fn light_report_mode(&mut self) -> JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>
                 where Self: std::marker::Sized
             {
-                SubCommandMode::new(self)
+                LightsStatus::once(self)
             }
         }
 
