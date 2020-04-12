@@ -1375,12 +1375,26 @@ mod driver {
     }
 }
 
+/// A manager for dealing with Joy-Cons.
 pub struct JoyConManager {
     hidapi: Arc<HidApi>,
     pub connected_joycon_devices: Vec<JoyConDevice>,
 }
 
 impl JoyConManager {
+    /// Search Joy-Con devices and store.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use joycon_rs::prelude::JoyConManager;
+    ///
+    /// let manager = JoyConManager::new().unwrap();
+    /// manager.connected_joycon_devices.into_iter()
+    ///     .for_each(|joycon_device| {
+    ///         // do something amazing with Joy-Con
+    ///     });
+    /// ```
     pub fn new() -> JoyConResult<Self> {
         let hidapi = HidApi::new()?;
         let devices = hidapi.device_list()
