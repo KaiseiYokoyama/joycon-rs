@@ -306,6 +306,25 @@ mod driver {
 
     #[derive(Debug)]
     /// The controller user uses to play with.
+    /// If you're not happy with this implementation, you can use `JoyConDriver` trait.
+    ///
+    /// # Examples
+    /// ```
+    /// use joycon_rs::prelude::{JoyConManager, SimpleJoyConDriver, lights::*};
+    ///
+    /// let manager = JoyConManager::new().unwrap();
+    /// let mut simple_joycon_drivers = manager.connected_joycon_devices.into_iter()
+    ///     .flat_map(|joycon_device| SimpleJoyConDriver::new(joycon_device))
+    ///     .collect::<Vec<SimpleJoyConDriver>>();
+    ///
+    /// // set player's lights
+    /// simple_joycon_drivers.iter_mut()
+    ///     .try_for_each(|driver| {
+    ///         driver.set_lights(&vec![SimpleJoyConDriver::LIGHT_UP[idx % SimpleJoyConDriver::LIGHT_UP.len()]], &vec![])?;
+    ///         Ok(())
+    ///     })
+    ///     .unwrap();
+    /// ```
     pub struct SimpleJoyConDriver {
         /// The controller user uses
         pub joycon: JoyConDevice,
@@ -317,6 +336,7 @@ mod driver {
     }
 
     impl SimpleJoyConDriver {
+        /// Constructs a new `SimpleJoyConDriver`.
         pub fn new(joycon: JoyConDevice) -> JoyConResult<Self> {
             // joycon.set_blocking_mode(true);
             // joycon.set_blocking_mode(false);
