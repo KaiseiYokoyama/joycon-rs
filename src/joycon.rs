@@ -113,7 +113,7 @@ mod driver {
     use super::*;
     use std::collections::HashSet;
     pub use global_packet_number::GlobalPacketNumber;
-    pub use joycon_features::{JoyConFeatures, IMUFeature};
+    pub use joycon_features::{JoyConFeature, IMUFeature};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Rotation {
@@ -171,10 +171,10 @@ mod driver {
     }
 
     /// Features on Joy-Cons which needs to set up.
-    /// ex. IMU(6-Axis sensor), NFC/IR, LED, Vibration
+    /// ex. IMU(6-Axis sensor), NFC/IR, Vibration
     pub mod joycon_features {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum JoyConFeatures {
+        pub enum JoyConFeature {
             IMUFeature(IMUFeature),
             Vibration,
         }
@@ -330,7 +330,7 @@ mod driver {
         pub joycon: JoyConDevice,
         /// rotation of controller
         pub rotation: Rotation,
-        enabled_features: HashSet<JoyConFeatures>,
+        enabled_features: HashSet<JoyConFeature>,
         /// Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
         global_packet_number: GlobalPacketNumber,
     }
@@ -435,10 +435,10 @@ mod driver {
         }
 
         /// Enable Joy-Con's feature. ex. IMU(6-Axis sensor), Vibration(Rumble)
-        fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()>;
+        fn enable_feature(&mut self, feature: JoyConFeature) -> JoyConResult<()>;
 
         /// Get Enabled features.
-        fn enabled_features(&self) -> &HashSet<JoyConFeatures>;
+        fn enabled_features(&self) -> &HashSet<JoyConFeature>;
 
         /// Get Joy-Con devices deal with.
         fn devices(&self) -> Vec<&JoyConDevice>;
@@ -461,16 +461,16 @@ mod driver {
             self.global_packet_number = self.global_packet_number.next();
         }
 
-        fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()> {
+        fn enable_feature(&mut self, feature: JoyConFeature) -> JoyConResult<()> {
             match feature {
-                JoyConFeatures::IMUFeature(feature) => {
+                JoyConFeature::IMUFeature(feature) => {
                     let data: [u8; 4] = feature.into();
                     // enable IMU
                     self.send_sub_command(SubCommand::EnableIMU, &[0x01])?;
                     // set config
                     self.send_sub_command(SubCommand::SetIMUSensitivity, &data)?;
                 }
-                JoyConFeatures::Vibration => {
+                JoyConFeature::Vibration => {
                     // enable vibration
                     self.send_sub_command(SubCommand::EnableVibration, &[0x01])?;
                 }
@@ -481,7 +481,7 @@ mod driver {
             Ok(())
         }
 
-        fn enabled_features(&self) -> &HashSet<JoyConFeatures> {
+        fn enabled_features(&self) -> &HashSet<JoyConFeature> {
             &self.enabled_features
         }
 
@@ -1061,11 +1061,11 @@ mod driver {
                     let imf_enabled = driver.enabled_features()
                         .iter()
                         .any(|jf| match jf {
-                            JoyConFeatures::IMUFeature(_) => true,
+                            JoyConFeature::IMUFeature(_) => true,
                             _ => false,
                         });
                     if !imf_enabled {
-                        driver.enable_features(JoyConFeatures::IMUFeature(IMUFeature::default()))?;
+                        driver.enable_feature(JoyConFeature::IMUFeature(IMUFeature::default()))?;
                     }
 
                     Ok(driver)
