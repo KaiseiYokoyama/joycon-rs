@@ -182,6 +182,8 @@ mod driver {
         pub use imu_sensitivity::IMUConfig;
 
         pub mod imu_sensitivity {
+            use std::hash::Hash;
+
             /// Gyroscope sensitivity
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub enum GyroscopeSensitivity {
@@ -263,6 +265,13 @@ mod driver {
                         gyroscope_performance_rate as u8,
                         accelerometer_anti_aliasing_filter_bandwidth as u8
                     ]
+                }
+            }
+
+            impl Hash for IMUConfig {
+                fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                    // Returns constant value.
+                    0.hash(state);
                 }
             }
         }
