@@ -304,7 +304,6 @@ mod driver {
         }
     }
 
-    #[derive(Debug)]
     /// The controller user uses to play with.
     /// If you're not happy with this implementation, you can use `JoyConDriver` trait.
     ///
@@ -325,6 +324,7 @@ mod driver {
     ///     })
     ///     .unwrap();
     /// ```
+    #[derive(Debug)]
     pub struct SimpleJoyConDriver {
         /// The controller user uses
         pub joycon: JoyConDevice,
