@@ -3,14 +3,18 @@ pub mod joycon;
 pub mod prelude {
     pub use hidapi::*;
     pub use crate::result::*;
+    pub use crate::joycon::*;
 }
 
 pub mod result {
+    // use crate::prelude::SubCommand;
     use hidapi::HidError;
 
     #[derive(Debug)]
     pub enum JoyConError {
         HidApiError(hidapi::HidError),
+        // SubCommandError(SubCommand),
+        SubCommandError(u8),
         JoyConDeviceError(JoyConDeviceError),
         JoyConReportError(JoyConReportError),
     }
