@@ -113,7 +113,7 @@ mod driver {
     use super::*;
     use std::collections::HashSet;
     pub use global_packet_number::GlobalPacketNumber;
-    pub use joycon_features::{JoyConFeature, IMUFeature};
+    pub use joycon_features::{JoyConFeature, IMUConfig};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Rotation {
@@ -170,16 +170,16 @@ mod driver {
         Landscape,
     }
 
-    /// Features on Joy-Cons which needs to set up.
-    /// ex. IMU(6-Axis sensor), NFC/IR, Vibration
     pub mod joycon_features {
+        /// Features on Joy-Cons which needs to set up.
+        /// ex. IMU(6-Axis sensor), NFC/IR, Vibration
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum JoyConFeature {
-            IMUFeature(IMUFeature),
+            IMUFeature(IMUConfig),
             Vibration,
         }
 
-        pub use imu_sensitivity::IMUFeature;
+        pub use imu_sensitivity::IMUConfig;
 
         pub mod imu_sensitivity {
             /// Gyroscope sensitivity
@@ -238,17 +238,19 @@ mod driver {
                 }
             }
 
-            #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-            pub struct IMUFeature {
+            /// # Notice
+            /// `IMUConfig` returns constant hash value.
+            #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+            pub struct IMUConfig {
                 pub gyroscope_sensitivity: GyroscopeSensitivity,
                 pub accelerometer_sensitivity: AccelerometerSensitivity,
                 pub gyroscope_performance_rate: GyroscopePerformanceRate,
                 pub accelerometer_anti_aliasing_filter_bandwidth: AccelerometerAntiAliasingFilterBandwidth,
             }
 
-            impl Into<[u8; 4]> for IMUFeature {
+            impl Into<[u8; 4]> for IMUConfig {
                 fn into(self) -> [u8; 4] {
-                    let IMUFeature {
+                    let IMUConfig {
                         gyroscope_sensitivity,
                         accelerometer_sensitivity,
                         gyroscope_performance_rate,
@@ -1065,7 +1067,7 @@ mod driver {
                             _ => false,
                         });
                     if !imf_enabled {
-                        driver.enable_feature(JoyConFeature::IMUFeature(IMUFeature::default()))?;
+                        driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
                     }
 
                     Ok(driver)
