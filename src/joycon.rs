@@ -355,14 +355,20 @@ mod driver {
     }
 
     pub trait JoyConDriver {
+        /// Send command to Joy-Con
         fn write(&self, data: &[u8]) -> JoyConResult<usize>;
 
+        /// Read reply from Joy-Con
         fn read(&self, buf: &mut [u8]) -> JoyConResult<usize>;
 
+        /// Get global packet number
         fn global_packet_number(&self) -> u8;
 
+        /// Increase global packet number. Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
         fn increase_global_packet_number(&mut self);
 
+        /// Send command, sub-command, and data (sub-command's arguments) with u8 integers
+        /// This returns ACK packet for the command or Error.
         fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
             use input_report_mode::sub_command_mode::AckByte;
 
@@ -397,10 +403,14 @@ mod driver {
             }
         }
 
+        /// Send sub-command, and data (sub-command's arguments) with u8 integers
+        /// This returns ACK packet for the command or Error.
         fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
             self.send_command_raw(1, sub_command, data)
         }
 
+        /// Send command, sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
+        /// This returns ACK packet for the command or Error.
         fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
             let command = command as u8;
             let sub_command = sub_command as u8;
@@ -408,11 +418,13 @@ mod driver {
             self.send_command_raw(command, sub_command, data)
         }
 
+        /// Send sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
+        /// This returns ACK packet for the command or Error.
         fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
             self.send_command(Command::RumbleAndSubCommand, sub_command, data)
         }
 
-        /// disable Joy-Con's features
+        /// Initialize Joy-Con's status
         fn reset(&mut self) -> JoyConResult<()> {
             // disable IMU (6-Axis sensor)
             self.send_sub_command(SubCommand::EnableIMU, &[0x00])?;
@@ -422,10 +434,13 @@ mod driver {
             Ok(())
         }
 
+        /// Enable Joy-Con's feature. ex. IMU(6-Axis sensor), Vibration(Rumble)
         fn enable_features(&mut self, feature: JoyConFeatures) -> JoyConResult<()>;
 
+        /// Get Enabled features.
         fn enabled_features(&self) -> &HashSet<JoyConFeatures>;
 
+        /// Get Joy-Con devices deal with.
         fn devices(&self) -> Vec<&JoyConDevice>;
     }
 
