@@ -819,10 +819,16 @@ mod driver {
             }
         }
 
+        /// Receive standard input report with sub-command's reply.
+        ///
+        /// If you want to send sub-command and get reply, imply [`SubCommandReplyData`] for your struct.
+        ///
+        /// [`SubCommandReplyData`]: trait.SubCommandReplyData.html
         pub mod sub_command_mode {
             use super::*;
             use std::marker::PhantomData;
 
+            /// Ack byte. If it is ACK, it contains data type.
             #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
             pub enum AckByte {
                 Ack {
@@ -843,7 +849,53 @@ mod driver {
                 }
             }
 
-            // todo write docs
+            /// An interface for dealing with sub-command's reply.
+            ///
+            /// # Example - implement `SubCommandReplyData`
+            /// ```ignore
+            /// #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+            /// pub struct LightsStatus {
+            ///     light_up: Vec<LightUp>,
+            ///     flash: Vec<Flash>,
+            /// }
+            ///
+            /// const LIGHT_UP: [LightUp; 4] =
+            ///     [LightUp::LED0, LightUp::LED1, LightUp::LED2, LightUp::LED3];
+            /// const FLASH: [Flash; 4] =
+            ///     [Flash::LED0, Flash::LED1, Flash::LED2, Flash::LED3];
+            ///
+            /// impl TryFrom<[u8; 35]> for LightsStatus {
+            ///     type Error = JoyConError;
+            ///
+            ///     fn try_from(value: [u8; 35]) -> Result<Self, Self::Error> {
+            ///         let value = value[0];
+            ///
+            ///         // parse reply
+            ///         let light_up = LIGHT_UP.iter()
+            ///             .filter(|&&l| {
+            ///                 let light = l as u8;
+            ///                 value & light == light
+            ///             })
+            ///             .cloned()
+            ///             .collect();
+            ///         let flash = FLASH.iter()
+            ///             .filter(|&&f| {
+            ///                 let flash = f as u8;
+            ///                 value & flash == flash
+            ///             })
+            ///             .cloned()
+            ///             .collect();
+            ///
+            ///         Ok(LightsStatus { light_up, flash })
+            ///     }
+            /// }
+            ///
+            /// impl SubCommandReplyData for LightsStatus {
+            ///     type ArgsType = [u8; 0];
+            ///     const SUB_COMMAND: SubCommand = SubCommand::GetPlayerLights;
+            ///     const ARGS: Self::ArgsType = [];
+            /// }
+            /// ```
             pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
                 type ArgsType: AsRef<[u8]>;
                 const SUB_COMMAND: SubCommand;
@@ -906,6 +958,7 @@ mod driver {
                 }
             }
 
+            /// Receive standard input report with sub-command's reply.
             pub struct SubCommandMode<D, RD>
                 where D: JoyConDriver, RD: SubCommandReplyData
             {
@@ -939,17 +992,11 @@ mod driver {
             {
                 type Mode = SubCommandMode<D, RD>;
                 type Report = StandardInputReport<SubCommandReport<RD>>;
-                // type ArgsType = [u8; 1];
-                // const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
-                // const ARGS: Self::ArgsType = [0x21];
                 type ArgsType = RD::ArgsType;
                 const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
                 const ARGS: Self::ArgsType = RD::ARGS;
 
                 fn setup(driver: D) -> JoyConResult<D> {
-                    // let mut driver = driver;
-                    // driver.send_sub_command(RD::SUB_COMMAND, RD::ARGS.as_ref())?;
-
                     Ok(driver)
                 }
 
