@@ -9,7 +9,7 @@ pub use driver::{
     SimpleJoyConDriver,
     Command,
     SubCommand,
-    input_report_mode,
+    input_report_mode::*,
     lights,
 };
 
@@ -321,6 +321,7 @@ mod driver {
     /// # Examples
     /// ```
     /// use joycon_rs::prelude::{JoyConManager, SimpleJoyConDriver, lights::*};
+    /// use joycon_rs::result::JoyConResult;
     ///
     /// let manager = JoyConManager::new().unwrap();
     /// let mut simple_joycon_drivers = manager.connected_joycon_devices.into_iter()
@@ -329,8 +330,8 @@ mod driver {
     ///
     /// // set player's lights
     /// simple_joycon_drivers.iter_mut()
-    ///     .try_for_each(|driver| {
-    ///         driver.set_lights(&vec![SimpleJoyConDriver::LIGHT_UP[idx % SimpleJoyConDriver::LIGHT_UP.len()]], &vec![])?;
+    ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
+    ///         driver.set_lights(&vec![SimpleJoyConDriver::LIGHT_UP[0]], &vec![])?;
     ///         Ok(())
     ///     })
     ///     .unwrap();
@@ -1009,6 +1010,9 @@ mod driver {
             }
         }
 
+        /// Receive standard full report (standard input report with IMU(6-Axis sensor) data).
+        ///
+        /// Pushes current state at 60Hz.
         pub mod standard_full_mode {
             use super::*;
 
@@ -1089,6 +1093,41 @@ mod driver {
             }
 
             /// Joy-Con emitting standard full report includes IMU(6-Axis sensor)
+            ///
+            /// # Example
+            /// ```no_run
+            /// use joycon_rs::prelude::*;
+            ///
+            /// let (sender, receiver) = std::sync::mpsc::channel();
+            ///
+            /// JoyConManager::new()
+            ///     .unwrap()
+            ///     .connected_joycon_devices
+            ///     .into_iter()
+            ///     .flat_map(|j| SimpleJoyConDriver::new(j))
+            ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
+            ///         let sender = sender.clone();
+            ///
+            ///         // Set Joy-Con's mode
+            ///         let joycon = StandardFullMode::new(driver)?;
+            ///
+            ///         std::thread::spawn( move || {
+            ///             loop {
+            ///                 sender.send(joycon.read_input_report())
+            ///                       .unwrap();
+            ///             }
+            ///         });
+            ///
+            ///         Ok(())
+            ///     })
+            ///     .unwrap();
+            ///
+            /// // Receive all Joy-Con's standard full reports
+            /// while let Ok(standard_full_report) = receiver.recv() {
+            ///     // Output reports
+            ///     dbg!(standard_full_report);
+            /// }
+            /// ```
             pub struct StandardFullMode<D: JoyConDriver> {
                 driver: D,
             }
@@ -1320,7 +1359,7 @@ mod driver {
     }
 
     pub mod lights {
-        use super::{*, input_report_mode:: sub_command_mode::*};
+        use super::{*, input_report_mode::sub_command_mode::*};
         use std::convert::TryFrom;
         use crate::joycon::driver::input_report_mode::StandardInputReport;
 
