@@ -331,7 +331,7 @@ mod driver {
     /// // set player's lights
     /// simple_joycon_drivers.iter_mut()
     ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
-    ///         driver.set_lights(&vec![SimpleJoyConDriver::LIGHT_UP[0]], &vec![])?;
+    ///         driver.set_player_lights(&vec![SimpleJoyConDriver::LIGHT_UP[0]], &vec![])?;
     ///         Ok(())
     ///     })
     ///     .unwrap();
@@ -806,8 +806,8 @@ mod driver {
 
         /// Standard input report with extra report.
         pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
-            common: CommonReport,
-            extra: EX,
+            pub common: CommonReport,
+            pub extra: EX,
         }
 
         impl<EX: TryFrom<[u8; 349], Error=JoyConError>> TryFrom<[u8; 362]> for StandardInputReport<EX> {
@@ -1425,6 +1425,30 @@ mod driver {
         }
     }
 
+    /// Operate Joy-Con's player lights (LEDs). The gist of this module is [`Lights`].
+    ///
+    /// [`Lights`]: trait.Lights.html
+    ///
+    /// # Usage
+    /// ```
+    /// use joycon_rs::prelude::{*, lights::*};
+    ///
+    /// let mut joycon_driver = JoyConManager::new()
+    ///     .unwrap()
+    ///     .connected_joycon_devices
+    ///     .into_iter()
+    ///     .flat_map(|d| SimpleJoyConDriver::new(d))
+    ///     .next().unwrap();
+    ///
+    /// // Set player lights lightning and flashing.
+    /// joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
+    ///
+    /// // Get status of player lights
+    /// let player_lights_status = joycon_driver.get_player_lights()
+    ///     .unwrap()
+    ///     .extra;
+    /// dbg!(player_lights_status);
+    /// ```
     pub mod lights {
         use super::{*, input_report_mode::sub_command_mode::*};
         use std::convert::TryFrom;
@@ -1433,33 +1457,34 @@ mod driver {
         /// LED to keep on lightning up / lightning
         #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
         pub enum LightUp {
-            /// closest led to SL Button
+            /// Closest led to SL Button
             LED0 = 0x01,
-            /// second closest led to SL Button
+            /// Second closest led to SL Button
             LED1 = 0x02,
-            /// second closest led to SR Button
+            /// Second closest led to SR Button
             LED2 = 0x04,
-            /// closest let to SR Button
+            /// Closest let to SR Button
             LED3 = 0x08,
         }
 
         /// LED to flash / flashing
         #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
         pub enum Flash {
-            /// closest led to SL Button
+            /// Closest led to SL Button
             LED0 = 0x10,
-            /// second closest led to SL Button
+            /// Second closest led to SL Button
             LED1 = 0x20,
-            /// second closest led to SR Button
+            /// Second closest led to SR Button
             LED2 = 0x40,
-            /// closest let to SR Button
+            /// Closest let to SR Button
             LED3 = 0x80,
         }
 
+        /// Status of player lights.
         #[derive(Debug, Clone, Hash, Eq, PartialEq)]
         pub struct LightsStatus {
-            light_up: Vec<LightUp>,
-            flash: Vec<Flash>,
+            pub light_up: Vec<LightUp>,
+            pub flash: Vec<Flash>,
         }
 
         const LIGHT_UP: [LightUp; 4] =
@@ -1499,12 +1524,70 @@ mod driver {
             const ARGS: Self::ArgsType = [];
         }
 
+        /// Operations of player lights.
         pub trait Lights: JoyConDriver {
             const LIGHT_UP: [LightUp; 4] = LIGHT_UP;
             const FLASH: [Flash; 4] = FLASH;
 
-            /// light up or flash LEDs on controller, vice versa.
-            fn set_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<[u8; 362]> {
+            /// Light up or flash LEDs on controller, vice versa.
+            ///
+            /// # Example
+            /// If you run this code,
+            ///
+            /// ```no_run
+            /// use joycon_rs::prelude::{*, lights::*};
+            ///
+            /// // some code omitted
+            ///
+            /// # let mut joycon_driver = JoyConManager::new()
+            /// #     .unwrap()
+            /// #     .connected_joycon_devices
+            /// #     .into_iter()
+            /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
+            /// #     .next().unwrap();
+            /// joycon_driver.set_player_lights(&vec![LightUp::LED0],&vec![]).unwrap();
+            /// ```
+            ///
+            /// player lights will be...
+            /// > [SL Button] 💡🤔🤔🤔 [SR Button]
+            ///
+            ///
+            /// For another example,
+            /// ```no_run
+            /// # use joycon_rs::prelude::{*, lights::*};
+            /// #
+            /// # let mut joycon_driver = JoyConManager::new()
+            /// #     .unwrap()
+            /// #     .connected_joycon_devices
+            /// #     .into_iter()
+            /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
+            /// #     .next().unwrap();
+            /// joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
+            /// ```
+            ///
+            /// player lights will be...
+            /// > [SL Button] 🤔🤔💡📸 [SR Button]
+            ///
+            /// ## Duplication
+            ///
+            /// If a command to a certain LED is duplicated, the lighting command takes precedence.
+            ///
+            /// ```no_run
+            /// # use joycon_rs::prelude::{*, lights::*};
+            /// #
+            /// # let mut joycon_driver = JoyConManager::new()
+            /// #     .unwrap()
+            /// #     .connected_joycon_devices
+            /// #     .into_iter()
+            /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
+            /// #     .next().unwrap();
+            /// joycon_driver.set_player_lights(&vec![LightUp::LED1], &vec![Flash::LED1]).unwrap();
+            /// ```
+            ///
+            /// Player lights will be...
+            /// > [SL Button] 🤔💡🤔🤔 [SR Button]
+            ///
+            fn set_player_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<[u8; 362]> {
                 let arg = light_up.iter()
                     .map(|&lu| lu as u8)
                     .sum::<u8>()
@@ -1525,15 +1608,33 @@ mod driver {
                 }
             }
 
-            /// Get status of LEDs on controller
-            fn light_report_mode(&mut self) -> JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>
+            /// Get status of player lights on controller.
+            /// 
+            /// # Example
+            /// 
+            /// ```no_run
+            /// use joycon_rs::prelude::{*, lights::*};
+            ///
+            /// # let mut joycon_driver = JoyConManager::new()
+            /// #     .unwrap()
+            /// #     .connected_joycon_devices
+            /// #     .into_iter()
+            /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
+            /// #     .next().unwrap();
+            /// let player_lights_status = joycon_driver.get_player_lights()
+            ///     .unwrap()
+            ///     .extra;
+            /// dbg!(player_lights_status);
+            /// ```
+            /// 
+            fn get_player_lights(&mut self) -> JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>
                 where Self: std::marker::Sized
             {
                 LightsStatus::once(self)
             }
         }
 
-        impl Lights for SimpleJoyConDriver {}
+        impl<D> Lights for D where D: JoyConDriver {}
     }
 
     #[allow(non_camel_case_types)]
