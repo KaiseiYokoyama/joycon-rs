@@ -1183,6 +1183,12 @@ mod driver {
             }
         }
 
+        /// Receive simple HID report.
+        ///
+        /// Simple HID report consists of input report id, button status,
+        /// stick direction, filter data.
+        ///
+        /// Pushes updates with every button press.
         pub mod simple_hid_mode {
             use super::*;
 
@@ -1317,6 +1323,41 @@ mod driver {
                 }
             }
 
+            /// Simple HID mode pushes updates with every button press.
+            ///
+            /// # Example
+            /// ```no_run
+            /// use joycon_rs::prelude::*;
+            ///
+            /// let (sender, receiver) = std::sync::mpsc::channel();
+            ///
+            /// JoyConManager::new()
+            ///     .unwrap()
+            ///     .connected_joycon_devices
+            ///     .into_iter()
+            ///     .flat_map(|d| SimpleJoyConDriver::new(d))
+            ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
+            ///         let sender = sender.clone();
+            ///
+            ///         // Set Joy-Con's mode
+            ///         let simple_hid_mode_joycon = SimpleHIDMode::new(driver)?;
+            ///
+            ///         std::thread::spawn( move || {
+            ///             loop {
+            ///                 sender.send(simple_hid_mode_joycon.read_input_report())
+            ///                       .unwrap();
+            ///             }
+            ///         });
+            ///         Ok(())
+            ///     })
+            ///     .unwrap();
+            ///
+            /// // Receive all Joy-Con's simple HID reports
+            /// while let Ok(simple_hid_report) = receiver.recv() {
+            ///     // Output reports
+            ///     dbg!(simple_hid_report);
+            /// }
+            /// ```
             pub struct SimpleHIDMode<D: JoyConDriver> {
                 driver: D,
             }
