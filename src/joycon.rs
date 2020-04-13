@@ -9,7 +9,7 @@ pub use driver::{
     SimpleJoyConDriver,
     Command,
     SubCommand,
-    input_report_mode::*,
+    input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode, SubCommandMode},
     lights,
 };
 
@@ -504,18 +504,28 @@ mod driver {
 
     /// JoyCon's input report mode is divided into five main categories.
     ///
-    /// - [`SimpleHIDMode<D>`]: Simple HID mode. Pushes updates with every button press.
-    /// - [`StandardFullMode<D>`]: IMU(6-Axis sensor) data with Standard Input Report
-    /// - [`SubCommandMode<D, RD>`]: SubCommand's reply with Standard Input Report
-    /// - NFC/IR MCU FW update with Standard Input Report (Unimplemented)
-    /// - NFC/IR data with Standard Input Report (Unimplemented)
+    /// | Struct | Remarks | Frequency |
+    /// | :-- | :-- | :-- |
+    /// | [`SimpleHIDMode<D>`] | Simple HID mode. Reports pushed buttons, and stick directions (one of [8 directions]). | (Every time some button pressed) |
+    /// | [`StandardFullMode<D>`] | IMU(6-Axis sensor) data with standard input report | 60Hz |
+    /// | [`SubCommandMode<D, RD>`] | SubCommand's reply with standard input report | ? |
+    /// | (Unimplemented) | NFC/IR MCU FW update with standard input report  | |
+    /// | (Unimplemented) | NFC/IR data with standard input report | 60Hz |
     ///
-    /// Standard input report consists of input report ID, Timer, battery level,
-    /// connection info, button status, analog stick data, and vibrator input report.
+    /// Standard input report consists of input report ID, Timer, [battery level],
+    /// [connection info], [button status], [analog stick data], and vibrator input report.
     ///
+    /// If you want to implement input report mode, you can use [`InputReportMode<D>`].
+    ///
+    /// [`SimpleHIDMode<D>`]: simple_hid_mode/struct.SimpleHIDMode.html
+    /// [8 directions]: simple_hid_mode/enum.StickDirection.html
     /// [`StandardFullMode<D>`]: standard_full_mode/struct.StandardFullMode.html
     /// [`SubCommandMode<D, RD>`]: sub_command_mode/struct.SubCommandMode.html
-    /// [`SimpleHIDMode<D>`]: simple_hid_mode/struct.SimpleHIDMode.html
+    /// [battery level]: struct.Battery.html
+    /// [connection info]: struct.ConnectionInfo.html
+    /// [button status]: struct.PushedButtons.html
+    /// [analog stick data]: struct.AnalogStickData.html
+    /// [`InputReportMode<D>`]: trait.InputReportMode.html
     pub mod input_report_mode {
         use super::*;
         pub use common::*;
@@ -697,6 +707,7 @@ mod driver {
                 }
             }
 
+            /// Common parts of the standard input report
             #[derive(Debug, Clone, PartialEq)]
             pub struct CommonReport {
                 input_report_id: u8,
