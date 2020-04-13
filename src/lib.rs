@@ -1,3 +1,5 @@
+#![doc(html_logo_url = "https://user-images.githubusercontent.com/8509057/79100490-9a4a7900-7da1-11ea-9ee4-5e15439bbd0c.png")]
+
 pub mod joycon;
 
 pub mod prelude {
