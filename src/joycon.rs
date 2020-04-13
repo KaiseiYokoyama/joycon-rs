@@ -502,9 +502,24 @@ mod driver {
         }
     }
 
+    /// JoyCon's input report mode is divided into five main categories.
+    ///
+    /// - [`SimpleHIDMode<D>`]: Simple HID mode. Pushes updates with every button press.
+    /// - [`StandardFullMode<D>`]: IMU(6-Axis sensor) data with Standard Input Report
+    /// - [`SubCommandMode<D, RD>`]: SubCommand's reply with Standard Input Report
+    /// - NFC/IR MCU FW update with Standard Input Report (Unimplemented)
+    /// - NFC/IR data with Standard Input Report (Unimplemented)
+    ///
+    /// Standard input report consists of input report ID, Timer, battery level,
+    /// connection info, button status, analog stick data, and vibrator input report.
+    ///
+    /// [`StandardFullMode<D>`]: standard_full_mode/struct.StandardFullMode.html
+    /// [`SubCommandMode<D, RD>`]: sub_command_mode/struct.SubCommandMode.html
+    /// [`SimpleHIDMode<D>`]: simple_hid_mode/struct.SimpleHIDMode.html
     pub mod input_report_mode {
         use super::*;
         pub use common::*;
+        pub use self::{sub_command_mode::SubCommandMode, standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
         use std::convert::TryFrom;
         use std::ops::{Deref, DerefMut};
 
@@ -778,7 +793,7 @@ mod driver {
             }
         }
 
-        /// Standard Input Report
+        /// Standard input report with extra report.
         pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
             common: CommonReport,
             extra: EX,
