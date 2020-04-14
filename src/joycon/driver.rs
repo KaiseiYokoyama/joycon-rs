@@ -420,6 +420,7 @@ pub mod input_report_mode {
     pub use self::{sub_command_mode::SubCommandMode, standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
     use std::convert::TryFrom;
     use std::ops::{Deref, DerefMut};
+    use std::hash::Hash;
 
     mod common {
         use super::*;
@@ -596,7 +597,7 @@ pub mod input_report_mode {
         }
 
         /// Common parts of the standard input report
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
         pub struct CommonReport {
             input_report_id: u8,
             timer: u8,
@@ -698,7 +699,9 @@ pub mod input_report_mode {
         pub extra: EX,
     }
 
-    impl<EX: TryFrom<[u8; 349], Error=JoyConError>> TryFrom<[u8; 362]> for StandardInputReport<EX> {
+    impl<EX> TryFrom<[u8; 362]> for StandardInputReport<EX>
+        where EX: TryFrom<[u8; 349], Error=JoyConError>
+    {
         type Error = JoyConError;
 
         fn try_from(value: [u8; 362]) -> Result<Self, Self::Error> {
@@ -723,7 +726,9 @@ pub mod input_report_mode {
         }
     }
 
-    impl<EX: TryFrom<[u8; 349], Error=JoyConError> + Debug> Debug for StandardInputReport<EX> {
+    impl<EX> Debug for StandardInputReport<EX>
+        where EX: TryFrom<[u8; 349], Error=JoyConError> + Debug
+    {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(
                 f,
@@ -733,6 +738,40 @@ pub mod input_report_mode {
             )
         }
     }
+
+    impl<EX> Clone for StandardInputReport<EX>
+        where EX: TryFrom<[u8; 349], Error=JoyConError> + Clone
+    {
+        fn clone(&self) -> Self {
+            let common = self.common.clone();
+            let extra = self.extra.clone();
+
+            StandardInputReport { common, extra }
+        }
+    }
+
+    impl<EX> Hash for StandardInputReport<EX>
+        where EX: TryFrom<[u8; 349], Error = JoyConError> + Hash
+    {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.common.hash(state);
+            self.extra.hash(state);
+        }
+    }
+
+    impl<EX> PartialEq for StandardInputReport<EX>
+        where EX: TryFrom<[u8; 349], Error=JoyConError> + PartialEq
+    {
+        fn eq(&self, other: &Self) -> bool {
+            self.common.eq(&other.common)
+                && self.extra.eq(&other.extra)
+        }
+    }
+
+    impl<EX> Eq for StandardInputReport<EX>
+        where EX: TryFrom<[u8; 349], Error=JoyConError> + Eq
+    {}
+
 
     /// Receive standard input report with sub-command's reply.
     ///
@@ -831,9 +870,9 @@ pub mod input_report_mode {
         pub struct SubCommandReport<RD>
             where RD: SubCommandReplyData
         {
-            ack_byte: AckByte,
-            sub_command_id: u8,
-            reply: RD,
+            pub ack_byte: AckByte,
+            pub sub_command_id: u8,
+            pub reply: RD,
         }
 
         impl<RD> Debug for SubCommandReport<RD>
@@ -1318,7 +1357,7 @@ pub mod input_report_mode {
 /// [`Lights`]: trait.Lights.html
 ///
 /// # Usage
-/// ```
+/// ```no_run
 /// use joycon_rs::prelude::{*, lights::*};
 ///
 /// let mut joycon_driver = JoyConManager::new()
