@@ -28,6 +28,8 @@ jobs:
         path: target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     - uses: actions/checkout@v2
+    - name: Setup
+      run: sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
