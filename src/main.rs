@@ -20,11 +20,11 @@ fn main() -> JoyConResult<()> {
             let sender = send.clone();
             std::thread::spawn(move || {
                 // let mode = StandardFullMode::new(driver).unwrap();
-                driver.set_lights(&vec![], &vec![]).unwrap();
-                driver.set_lights(&vec![SimpleJoyConDriver::LIGHT_UP[idx % SimpleJoyConDriver::LIGHT_UP.len()]], &vec![]).unwrap();
+                driver.set_player_lights(&vec![], &vec![]).unwrap();
+                driver.set_player_lights(&vec![LightUp::LED1], &vec![Flash::LED1]).unwrap();
                 // driver.set_lights(&vec![], &vec![SimpleJoyConDriver::FLASH[0]]).unwrap();
                 // let mode = driver.light_report_mode().unwrap();
-                sender.send(driver.light_report_mode()).unwrap();
+                sender.send(driver.get_player_lights()).unwrap();
                 // loop {
                     // every seconds, get lights status
                     // std::thread::sleep(std::time::Duration::from_secs(1));
