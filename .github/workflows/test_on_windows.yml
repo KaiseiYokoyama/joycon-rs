@@ -1,4 +1,4 @@
-name: Test on mac
+name: Test on windows
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
     branches: [ master, dev/* ]
 
 jobs:
-  test-on-macos:
+  test-on-windows:
 
-    runs-on: macos-latest
+    runs-on: windows-latest
 
     steps:
     - name: Cache cargo registry
