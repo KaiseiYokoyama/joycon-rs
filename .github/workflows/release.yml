@@ -1,0 +1,19 @@
+name: Publish on crates.io
+
+on:
+  release:
+    type: [published]
+    branches:
+      - master
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Login
+      run: cargo login ${{ secrets.CRATES_IO_API_ACCESS_TOKEN }}
+    - name: Publish
+      run: cargo publish
