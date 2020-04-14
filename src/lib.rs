@@ -101,6 +101,7 @@
 //!
 //! # Features
 //! You can use `Joycon-rs` for...
+//! - [Send] / [Receive] raw packets (u8 array) to / from Joy-Con
 //! - [Receive input to Joy-Con][input_report_mode]
 //!     - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.][SimpleHIDMode<D>]
 //!     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.][StandardFullMode<D>]
@@ -115,6 +116,8 @@
 //! [Github]: https://github.com/KaiseiYokoyama/joycon-rs
 //! [`hidapi-rs`]: https://github.com/ruabmbua/hidapi-rs
 //! [`mspc`]: https://doc.rust-lang.org/book/ch16-02-message-passing.html
+//! [Send]: joycon/trait.JoyConDriver.html#tymethod.write
+//! [Receive]: joycon/trait.JoyConDriver.html#tymethod.read
 //! [input_report_mode]: joycon/input_report_mode/index.html
 //! [SimpleHIDMode<D>]: joycon/input_report_mode/simple_hid_mode/struct.SimpleHIDMode.html
 //! [StandardFullMode<D>]: joycon/input_report_mode/standard_full_mode/struct.StandardFullMode.html
