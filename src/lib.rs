@@ -1,5 +1,125 @@
 #![doc(html_logo_url = "https://user-images.githubusercontent.com/8509057/79100490-9a4a7900-7da1-11ea-9ee4-5e15439bbd0c.png")]
 
+//! # Joycon-rs Library Documentation
+//!
+//! Hello, and welcome to joycon-rs documentation.
+//!
+//! Joycon-rs is a framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently.
+//! In a way, this library is a wrapper of [`hidapi-rs`].
+//! This is a free and open source library, the source code is available for download on [Github].
+//!
+//! Joycon-rs is in development and is still incomplete.
+//! Please be aware that the update will include breaking changes for the time being. Pardon out dust!
+//!
+//! # Usage
+//! First, add dependency to `Cargo.toml`
+//!
+//! ```toml
+//! [dependencies]
+//! joycon_rs = "*"
+//! ```
+//!
+//! Then, `use` prelude on `.rs` file.
+//! ```
+//! use joycon_rs::prelude::*;
+//! ```
+//!
+//! Perfect! Now you have Joycon-rs available in code.
+//!
+//! ### Receive reports
+//! For starters, let's take a simple signal from JoyCon.
+//! If you have more than one JoyCon, [`mspc`] can be very helpful.
+//!
+//! ```no_run
+//! use joycon_rs::prelude::*;
+//!
+//! let (tx, rx) = std::sync::mpsc::channel();
+//!
+//! JoyConManager::new()
+//!     .unwrap()
+//!     .connected_joycon_devices
+//!     .into_iter()
+//!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
+//!     .try_for_each::<_, JoyConResult<()>>(|driver| {
+//!         // Change JoyCon to Simple hid mode.
+//!         let simple_hid_mode = SimpleHIDMode::new(driver)?;
+//!
+//!         let tx = tx.clone();
+//!
+//!         // Spawn thread
+//!         std::thread::spawn( move || {
+//!             loop {
+//!                 // Forward the report to the main thread
+//!                 tx.send(simple_hid_mode.read_input_report()).unwrap();
+//!             }
+//!         });
+//!
+//!         Ok(())
+//!     })
+//!     .unwrap();
+//!
+//! // Receive reports from threads
+//! while let Ok(report) = rx.recv() {
+//!     // Output report
+//!     dbg!(report);
+//! }
+//! ```
+//!
+//! ### Ser player lights
+//! Then, lets deal with player lights.
+//!
+//! ```no_run
+//! use joycon_rs::prelude::{*, lights::*};
+//!
+//! let (tx, rx) = std::sync::mpsc::channel();
+//!
+//! JoyConManager::new()
+//!     .unwrap()
+//!     .connected_joycon_devices
+//!     .into_iter()
+//!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
+//!     .try_for_each::<_, JoyConResult<()>>(|mut driver| {
+//!         // Set player lights
+//!         // [SL BUTTON] 📸💡📸💡 [SR BUTTON]
+//!         driver.set_player_lights(&vec![LightUp::LED1, LightUp::LED3], &vec![Flash::LED0, Flash::LED2]).unwrap();
+//!         tx.send(driver.get_player_lights()).unwrap();
+//!         Ok(())
+//!     })
+//!     .unwrap();
+//!
+//! // Receive status of player lights
+//! while let Ok(Ok(light_status)) = rx.recv() {
+//!     assert_eq!(
+//!         light_status.extra.reply,
+//!         LightsStatus {
+//!             light_up: vec![LightUp::LED1, LightUp::LED3],
+//!             flash: vec![Flash::LED0, Flash::LED2],
+//!         }
+//!     )
+//! }
+//! ```
+//!
+//! # Features
+//! You can use `Joycon-rs` for...
+//! - [Receive input to Joy-Con][input_report_mode]
+//!     - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.][SimpleHIDMode<D>]
+//!     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.][StandardFullMode<D>]
+//!     - [Get status of Joy-Con][SubCommandMode<D, RD>]
+//! - [Deal with LED (Player lights)]
+//!
+//! ## Planning
+//! - Vibration (Rumble)
+//! - Receive NFC/IR data
+//! - Deal with HOME light
+//!
+//! [Github]: https://github.com/KaiseiYokoyama/joycon-rs
+//! [`hidapi-rs`]: https://github.com/ruabmbua/hidapi-rs
+//! [`mspc`]: https://doc.rust-lang.org/book/ch16-02-message-passing.html
+//! [input_report_mode]: joycon/input_report_mode/index.html
+//! [SimpleHIDMode<D>]: joycon/input_report_mode/simple_hid_mode/struct.SimpleHIDMode.html
+//! [StandardFullMode<D>]: joycon/input_report_mode/standard_full_mode/struct.StandardFullMode.html
+//! [SubCommandMode<D, RD>]: joycon/input_report_mode/sub_command_mode/struct.SubCommandMode.html
+//! [Deal with LED (Player lights)]: joycon/lights/index.html
 pub mod joycon;
 
 pub mod prelude {
