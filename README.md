@@ -13,6 +13,14 @@ Please see the documentation comments for detailed instructions on how to use it
  Joycon-rs is in development and is still incomplete.
  Please be aware that the update will include breaking changes for the time being. Pardon out dust!
 
+# Setup
+On macOS or Windows, there are no preparation.
+
+On linux, 
+```
+sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
+```
+
  # Usage
  First, add dependency to `Cargo.toml`
 
@@ -114,5 +122,7 @@ joycon_rs = "*"
  - Vibration (Rumble)
  - Receive NFC/IR data
  - Deal with HOME light
+ - Deal with Pro Controller
+ - Disconnect / Reconnect
  
 [`mspc`]: https://doc.rust-lang.org/book/ch16-02-message-passing.html
