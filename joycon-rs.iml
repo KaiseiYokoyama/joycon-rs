@@ -7,6 +7,11 @@
       <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/scan_for_joycons/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/scan_for_joycons/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/scan_for_joycons/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/scan_for_joycons/benches" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/scan_for_joycons/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
