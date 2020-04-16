@@ -17,3 +17,6 @@ name = "player_lights"
 
 [[example]]
 name = "standard_full_report"
+
+[[example]]
+name = "simple_hid_report"
