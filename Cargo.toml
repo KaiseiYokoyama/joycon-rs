@@ -14,3 +14,6 @@ name = "scan_for_joycons"
 
 [[example]]
 name = "player_lights"
+
+[[example]]
+name = "standard_full_report"
