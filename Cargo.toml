@@ -1,10 +1,26 @@
 [package]
 name = "joycon-rs"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Kaisei Yokoyama <yokoyama.kaisei.sm@alumni.tsukuba.ac.jp>"]
 edition = "2018"
+description = " a framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently"
+readme = "README.md"
+keywords = ["nintendo_switch", "joy-con", "gamedev", "hid"]
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 hidapi = "1.2.1"
+
+[[example]]
+name = "scan_for_joycons"
+
+[[example]]
+name = "player_lights"
+
+[[example]]
+name = "standard_full_report"
+
+[[example]]
+name = "simple_hid_report"
