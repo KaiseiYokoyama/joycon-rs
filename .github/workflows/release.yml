@@ -2,12 +2,12 @@ name: Publish on crates.io
 
 on:
   release:
-    type: [published]
+    type: [published, '!prereleased']
     branches:
       - master
 
 jobs:
-  build:
+  Release:
 
     runs-on: macos-latest
 
