@@ -11,3 +11,6 @@ hidapi = "1.2.1"
 
 [[example]]
 name = "scan_for_joycons"
+
+[[example]]
+name = "player_lights"
