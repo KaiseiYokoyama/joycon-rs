@@ -2,8 +2,9 @@ name: Publish on crates.io
 
 on:
   release:
-    type: [published]
-    branches:
+  push:
+    types: [published]
+#    branches:
 #       - master
     branches-ignore:
         - '**'
