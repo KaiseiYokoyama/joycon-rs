@@ -6,6 +6,7 @@ edition = "2018"
 description = " a framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently"
 readme = "README.md"
 keywords = ["nintendo_switch", "joy-con", "gamedev", "hid"]
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
