@@ -125,6 +125,13 @@
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
 pub mod joycon;
 
+#[cfg(doctest)]
+#[macro_use]
+extern crate doc_comment;
+
+#[cfg(doctest)]
+doctest!("../README.md");
+
 pub mod prelude {
     pub use hidapi::*;
     pub use crate::result::*;
