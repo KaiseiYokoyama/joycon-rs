@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
-pub use joycon_device::JoyConDevice;
-// pub use joycon::JoyCon;
+pub use device::JoyConDevice;
 pub use driver::{
     Rotation,
     JoyConDriver,
@@ -53,62 +52,7 @@ impl<'a> Debug for DebugHidDevice<'a> {
     }
 }
 
-mod joycon_device {
-    use super::*;
-    use std::ops::Deref;
-
-    /// The JoyCon device in user's hand.
-    pub enum JoyConDevice {
-        JoyConR(HidDevice),
-        JoyConL(HidDevice),
-        // note: I'll to it later
-        // ProCon(Arc<HidDevice>),
-    }
-
-    impl JoyConDevice {
-        pub const VENDOR_ID: u16 = 1406;
-        pub const PRODUCT_ID_JOYCON_L: u16 = 8198;
-        pub const PRODUCT_ID_JOYCON_R: u16 = 8199;
-
-        pub fn new(device_info: &DeviceInfo, hidapi: &HidApi) -> JoyConResult<Self> {
-            if device_info.vendor_id() != Self::VENDOR_ID {
-                Err(JoyConDeviceError::InvalidVendorID(device_info.vendor_id()))?;
-            }
-
-            let device = device_info.open_device(&hidapi)?;
-
-            match device_info.product_id() {
-                Self::PRODUCT_ID_JOYCON_L => Ok(JoyConDevice::JoyConL(device)),
-                Self::PRODUCT_ID_JOYCON_R => Ok(JoyConDevice::JoyConR(device)),
-                other => Err(JoyConDeviceError::InvalidProductID(other))?,
-            }
-        }
-    }
-
-    impl Deref for JoyConDevice {
-        type Target = HidDevice;
-
-        fn deref(&self) -> &Self::Target {
-            match self {
-                JoyConDevice::JoyConR(hd) => hd,
-                JoyConDevice::JoyConL(hd) => hd,
-            }
-        }
-    }
-
-    impl Debug for JoyConDevice {
-        fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-            write!(f,
-                   "{}({:?})",
-                   match self {
-                       JoyConDevice::JoyConR(_) => "JoyConR",
-                       JoyConDevice::JoyConL(_) => "JoyConL",
-                   },
-                   DebugHidDevice(&*self))
-        }
-    }
-}
-
+mod device;
 mod driver;
 
 /// A manager for dealing with Joy-Cons.
