@@ -10,7 +10,9 @@ pub use driver::{
     SubCommand,
     input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode, SubCommandMode},
     lights,
+    device_info,
 };
+pub use manager::JoyConManager;
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
@@ -54,38 +56,4 @@ impl<'a> Debug for DebugHidDevice<'a> {
 
 mod device;
 mod driver;
-
-/// A manager for dealing with Joy-Cons.
-pub struct JoyConManager {
-    hidapi: Arc<HidApi>,
-    pub connected_joycon_devices: Vec<JoyConDevice>,
-}
-
-impl JoyConManager {
-    /// Search Joy-Con devices and store.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use joycon_rs::prelude::JoyConManager;
-    ///
-    /// let manager = JoyConManager::new().unwrap();
-    /// manager.connected_joycon_devices.into_iter()
-    ///     .for_each(|joycon_device| {
-    ///         // do something amazing with Joy-Con
-    ///     });
-    /// ```
-    pub fn new() -> JoyConResult<Self> {
-        let hidapi = HidApi::new()?;
-        let devices = hidapi.device_list()
-            .flat_map(|di|
-                JoyConDevice::new(di, &hidapi)
-            )
-            .collect();
-
-        Ok(Self {
-            hidapi: Arc::new(hidapi),
-            connected_joycon_devices: devices,
-        })
-    }
-}
+mod manager;

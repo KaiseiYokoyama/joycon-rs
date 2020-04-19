@@ -3,8 +3,10 @@ use joycon_rs::prelude::{*, lights::*};
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
     JoyConManager::new()?
-        .connected_joycon_devices
-        .into_iter()
+        .lock()
+        .unwrap()
+        .connected_devices()
+        .iter()
         .try_for_each::<_,JoyConResult<()>>(|d| {
             let mut driver = SimpleJoyConDriver::new(d)?;
 

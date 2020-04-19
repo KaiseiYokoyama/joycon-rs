@@ -1,5 +1,4 @@
 #![doc(html_logo_url = "https://user-images.githubusercontent.com/8509057/79100490-9a4a7900-7da1-11ea-9ee4-5e15439bbd0c.png")]
-
 //! # Joycon-rs Library Documentation
 //!
 //! Hello, and welcome to joycon-rs documentation.
@@ -37,8 +36,10 @@
 //!
 //! JoyConManager::new()
 //!     .unwrap()
-//!     .connected_joycon_devices
-//!     .into_iter()
+//!     .lock()
+//!     .unwrap()
+//!     .connected_devices()
+//!     .iter()
 //!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|driver| {
 //!         // Change JoyCon to Simple hid mode.
@@ -75,8 +76,10 @@
 //!
 //! JoyConManager::new()
 //!     .unwrap()
-//!     .connected_joycon_devices
-//!     .into_iter()
+//!     .lock()
+//!     .unwrap()
+//!     .connected_devices()
+//!     .iter()
 //!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|mut driver| {
 //!         // Set player lights
@@ -149,6 +152,7 @@ pub mod result {
         SubCommandError(u8),
         JoyConDeviceError(JoyConDeviceError),
         JoyConReportError(JoyConReportError),
+        Disconnected,
     }
 
     impl From<hidapi::HidError> for JoyConError {

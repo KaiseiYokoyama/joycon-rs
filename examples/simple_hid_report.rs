@@ -6,8 +6,10 @@ fn main() -> JoyConResult<()> {
     let (tx, rx) = std::sync::mpsc::channel();
 
     let threads = JoyConManager::new()?
-        .connected_joycon_devices
-        .into_iter()
+        .lock()
+        .unwrap()
+        .connected_devices()
+        .iter()
         .flat_map(|d| SimpleJoyConDriver::new(d))
         .flat_map::<JoyConResult<_>,_>(|driver| {
             let simple_hid_mode =SimpleHIDMode::new(driver)?;

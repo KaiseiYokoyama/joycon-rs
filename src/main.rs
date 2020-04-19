@@ -13,32 +13,18 @@ fn main() -> JoyConResult<()> {
     //
     let manager = JoyConManager::new()?;
     // // println!("{:?}", &manager.connected_joycon_devices);
-    let threads = manager.connected_joycon_devices.into_iter()
+    let threads = manager.lock()
+        .unwrap()
+        .connected_devices()
+        .iter()
         .flat_map(|j| SimpleJoyConDriver::new(j))
         .enumerate()
-        .map(|(idx, mut driver)| {
+        .map(|(_idx, mut driver)| {
             let sender = send.clone();
             std::thread::spawn(move || {
-                // let mode = StandardFullMode::new(driver).unwrap();
                 driver.set_player_lights(&vec![], &vec![]).unwrap();
                 driver.set_player_lights(&vec![LightUp::LED1], &vec![Flash::LED1]).unwrap();
-                // driver.set_lights(&vec![], &vec![SimpleJoyConDriver::FLASH[0]]).unwrap();
-                // let mode = driver.light_report_mode().unwrap();
                 sender.send(driver.get_player_lights()).unwrap();
-                // loop {
-                    // every seconds, get lights status
-                    // std::thread::sleep(std::time::Duration::from_secs(1));
-                    // sender.send(mode.read_input_report());
-                    // sender.send(mode.read_input_report());
-                // }
-                // enable 6-axis sensor
-                // let simple_hid_mode = SimpleHIDMode::set(driver).unwrap();
-                // let standard_full_mode = StandardFullMode::set(driver).unwrap();
-                // loop {
-                //     if let Ok(update) = standard_full_mode.read_input_report() {
-                //         sender.send(update);
-                //     }
-                // }
             });
         })
         .collect::<Vec<_>>();
@@ -48,7 +34,7 @@ fn main() -> JoyConResult<()> {
     } else {
         let _ = std::iter::repeat(())
             .take(20)
-            .inspect(|_| { dbg!(receive.recv()); })
+            .inspect(|_| { dbg!(receive.recv().unwrap().unwrap()); })
             .collect::<Vec<_>>();
     }
 
