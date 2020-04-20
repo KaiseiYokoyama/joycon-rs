@@ -25,8 +25,8 @@ $ sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
 First, add dependency to `Cargo.toml`
 
 ```toml
-dependencies]
-oycon_rs = "*"
+[dependencies]
+joycon_rs = "*"
 ```
 
 Then, `use` prelude on `.rs` file.
