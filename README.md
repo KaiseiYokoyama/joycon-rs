@@ -17,97 +17,109 @@ Please see the documentation comments for detailed instructions on how to use it
 On macOS or Windows, there are no preparation.
 
 On linux, 
+```bash
+$ sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
 ```
-sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
+
+# Usage
+First, add dependency to `Cargo.toml`
+
+```toml
+dependencies]
+oycon_rs = "*"
 ```
 
- # Usage
- First, add dependency to `Cargo.toml`
+Then, `use` prelude on `.rs` file.
+```
+use joycon_rs::prelude::*;
+```
 
- ```toml
-[dependencies]
-joycon_rs = "*"
- ```
+Perfect! Now you have Joycon-rs available in code.
 
- Then, `use` prelude on `.rs` file.
- ```
- use joycon_rs::prelude::*;
- ```
+### Receive reports
+For starters, let's take a simple signal from JoyCon.
+If you use more than one JoyCon, [`mspc`] can be very helpful.
 
- Perfect! Now you have Joycon-rs available in code.
+```no_run
+use joycon_rs::prelude::*;
 
- ### Receive reports
- For starters, let's take a simple signal from JoyCon.
- If you have more than one JoyCon, [`mspc`] can be very helpful.
+let (tx, rx) = std::sync::mpsc::channel();
 
- ```no_run
- use joycon_rs::prelude::*;
+let _output = std::thread::spawn(move || {
+    // Push buttons or tilt the stick please.
+    // Stop with `Cmd + C` or `Ctrl + C`
+    while let Ok(message) = rx.recv() {
+        dbg!(message);
+    }
+});
 
- let (tx, rx) = std::sync::mpsc::channel();
+let manager = JoyConManager::new().unwrap();
+let (managed_devices, new_devices) = {
+let lock = manager.lock();
+    match lock {
+        Ok(m) => (m.managed_devices(),m.new_devices()),
+        Err(_) => unreachable!()
+    }
+};
 
- JoyConManager::new()
-     .unwrap()
-     .connected_joycon_devices
-     .into_iter()
-     .flat_map(|dev| SimpleJoyConDriver::new(dev))
-     .try_for_each::<_, JoyConResult<()>>(|driver| {
-         // Change JoyCon to Simple hid mode.
-         let simple_hid_mode = SimpleHIDMode::new(driver)?;
+managed_devices.into_iter()
+    .chain(new_devices)
+    .flat_map(|dev| SimpleJoyConDriver::new(&dev))
+    .try_for_each::<_, JoyConResult<()>>(|driver| {
+        // Change JoyCon to Simple hid mode.
+        let simple_hid_mode = SimpleHIDMode::new(driver)?;
+    
+        let tx = tx.clone();
+    
+        // Spawn thread
+        std::thread::spawn( move || {
+            loop {
+                // Forward the report to the main thread
+                tx.send(simple_hid_mode.read_input_report()).unwrap();
+            }
+        });
+    
+        Ok(())
+    })
+    .unwrap();
+```
 
-         let tx = tx.clone();
+### Ser player lights
+Then, lets deal with player lights.
 
-         // Spawn thread
-         std::thread::spawn( move || {
-             loop {
-                 // Forward the report to the main thread
-                 tx.send(simple_hid_mode.read_input_report()).unwrap();
-             }
-         });
+```no_run
+use joycon_rs::prelude::{*, lights::*};
 
-         Ok(())
-     })
-     .unwrap();
+let (tx, rx) = std::sync::mpsc::channel();
 
- // Receive reports from threads
- while let Ok(report) = rx.recv() {
-     // Output report
-     dbg!(report);
- }
- ```
+let _output = std::thread::spawn(move || {
+    // Stop with `Cmd + C` or `Ctrl + C`
+    while let Ok(message) = rx.recv() {
+        dbg!(message);
+    }
+});
 
- ### Ser player lights
- Then, lets deal with player lights.
+let manager = JoyConManager::new().unwrap();
+let (managed_devices, new_devices) = {
+let lock = manager.lock();
+    match lock {
+        Ok(m) => (m.managed_devices(),m.new_devices()),
+        Err(_) => unreachable!()
+    }
+};
 
- ```no_run
- use joycon_rs::prelude::{*, lights::*};
-
- let (tx, rx) = std::sync::mpsc::channel();
-
- JoyConManager::new()
-     .unwrap()
-     .connected_joycon_devices
-     .into_iter()
-     .flat_map(|dev| SimpleJoyConDriver::new(dev))
-     .try_for_each::<_, JoyConResult<()>>(|mut driver| {
-         // Set player lights
-         // [SL BUTTON] 📸💡📸💡 [SR BUTTON]
-         driver.set_player_lights(&vec![LightUp::LED1, LightUp::LED3], &vec![Flash::LED0, Flash::LED2]).unwrap();
-         tx.send(driver.get_player_lights()).unwrap();
-         Ok(())
-     })
-     .unwrap();
-
- // Receive status of player lights
- while let Ok(Ok(light_status)) = rx.recv() {
-     assert_eq!(
-         light_status.extra.reply,
-         LightsStatus {
-             light_up: vec![LightUp::LED1, LightUp::LED3],
-             flash: vec![Flash::LED0, Flash::LED2],
-         }
-     )
- }
- ```
+managed_devices.into_iter()
+    .chain(new_devices)
+    .flat_map(|dev| SimpleJoyConDriver::new(&dev))
+    .try_for_each::<_, JoyConResult<()>>(|mut driver| {
+        // Set player lights
+        // [SL BUTTON] 📸💡📸💡 [SR BUTTON]
+        driver.set_player_lights(&vec![LightUp::LED1, LightUp::LED3], &vec![Flash::LED0, Flash::LED2]).unwrap();
+        tx.send(driver.get_player_lights()).unwrap();
+        Ok(())
+    })
+    .unwrap();
+```
 
  # Features
  You can use `Joycon-rs` for...
