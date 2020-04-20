@@ -6,7 +6,6 @@ use crate::joycon::{
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
-use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use std::thread::JoinHandle;
 use std::option::Option::Some;
@@ -22,26 +21,26 @@ pub struct JoyConManager {
     devices: HashMap<JoyConMacAddress, Arc<Mutex<JoyConDevice>>>,
     scanner: Option<JoinHandle<()>>,
     scan_interval: Duration,
-    new_device_receiver: Receiver<Arc<Mutex<JoyConDevice>>>,
+    new_devices: crossbeam_channel::Receiver<Arc<Mutex<JoyConDevice>>>,
 }
 
 impl JoyConManager {
     /// Constructor
     pub fn new() -> JoyConResult<Arc<Mutex<Self>>> {
-        Self::with_duration(std::time::Duration::from_millis(100))
+        Self::with_interval(std::time::Duration::from_millis(100))
     }
 
-    pub fn with_duration(duration: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
+    pub fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
         let scanner = None;
-        let scan_cycle = duration;
-        let (tx, rx) = std::sync::mpsc::channel();
+        let scan_cycle = interval;
+        let (tx, rx) = crossbeam_channel::bounded(0);
 
         let manager = {
             let mut manager = JoyConManager {
                 devices: HashMap::new(),
                 scanner,
                 scan_interval: scan_cycle,
-                new_device_receiver: rx,
+                new_devices: rx,
             };
 
             // First scan
@@ -65,7 +64,7 @@ impl JoyConManager {
                     if let Ok(new_devices) = manager.scan() {
                         // If mspc channel is disconnected, end this thread.
                         let send_result = new_devices.into_iter()
-                            .try_for_each::<_, Result<(), std::sync::mpsc::SendError<_>>>(|new_device| {
+                            .try_for_each::<_, Result<(), crossbeam_channel::SendError<_>>>(|new_device| {
                                 tx.send(new_device)
                             });
                         if send_result.is_err() {
@@ -105,6 +104,7 @@ impl JoyConManager {
                 Ok((mac_address, device))
             })
             .collect::<HashMap<_, _>>();
+
         let old_devices = &self.devices;
 
         let keys = devices.keys().cloned().collect::<HashSet<_>>();
@@ -159,11 +159,11 @@ impl JoyConManager {
         let mut new_devices = Vec::new();
         let added_keys = keys.difference(&old_keys);
         added_keys.for_each(|key| {
-            if let Some(new_device) = devices.remove(key) {
-                let device_cloned = Arc::clone(&new_device);
+            if let Some(device) = devices.remove(key) {
+                let device_cloned = Arc::clone(&device);
                 new_devices.push(device_cloned);
 
-                self.devices.insert(key.clone(), new_device);
+                self.devices.insert(key.clone(), device);
             }
         });
 
@@ -171,7 +171,7 @@ impl JoyConManager {
     }
 
     /// Collection of managed JoyCons.
-    /// It includes disconnected devices.
+    /// It may contains disconnected ones.
     pub fn managed_devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>> {
         self.devices.values()
             .into_iter()
@@ -179,62 +179,50 @@ impl JoyConManager {
             .collect()
     }
 
-    /// Collection of managed and connected JoyCons.
-    pub fn connected_devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>> {
-        self.devices.values()
-            .into_iter()
-            .filter(|&d| {
-                let device = match d.lock() {
-                    Ok(d) => d,
-                    Err(d) => d.into_inner(),
-                };
-                device.is_connected()
-            })
-            .map(|d| Arc::clone(d))
-            .collect()
-    }
-
     /// Receiver of new devices.
-    /// The receiver keeps a record *from the construction of the manager* to the present.
-    /// For more information, please refer to [the official Rust documentation].
+    /// This method provides receiver of **mpmc** channel.
+    /// Since the channel has no capacity,
+    /// the message will disappear if it is not received at the same time as it is sent.
     ///
     /// # Example
     /// ```no_run
     /// use joycon_rs::prelude::*;
     ///
     /// let (tx, rx) = std::sync::mpsc::channel();
-    /// let output = std::thread::spawn( move || {
+    /// let _output = std::thread::spawn( move || {
     ///     while let Ok(update) = rx.recv() {
     ///         dbg!(update);
     ///     }
     /// });
     ///
     /// let manager = JoyConManager::new().unwrap();
-    /// let joycons = manager.lock().unwrap()
-    ///     .new_device_receiver()
-    ///     .iter()
-    ///     .flat_map(|d| SimpleJoyConDriver::new(&d))
-    ///     .flat_map::<JoyConResult<_>,_>(|driver| {
+    ///
+    /// let (managed_devices, new_devices) = {
+    ///     let lock = manager.lock();
+    ///     match lock {
+    ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+    ///         Err(_) => return,
+    ///     }
+    /// };
+    ///
+    /// managed_devices.into_iter()
+    ///     .chain(new_devices)
+    ///     .flat_map(|device| SimpleJoyConDriver::new(&device))
+    ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
     ///         let simple_hid_mode = SimpleHIDMode::new(driver)?;
     ///         let tx = tx.clone();
     ///
-    ///         let thread = std::thread::spawn( move || loop {
-    ///                 if tx.send(simple_hid_mode.read_input_report()).is_err() {
-    ///                     return;
-    ///                 }
-    ///             });
+    ///         let thread = std::thread::spawn(move || {
+    ///             loop {
+    ///                 tx.send(simple_hid_mode.read_input_report());
+    ///             }
+    ///         });
     ///
-    ///         Ok(thread)
-    ///     })
-    ///     .collect::<Vec<_>>();
-    ///
-    /// output.join();
-    ///
+    ///         Ok(())
+    ///     });
     /// ```
-    ///
-    /// [the official Rust documentation]: https://ykomatsu.github.io/rust/std/sync/mpsc/index.html
-    pub fn new_device_receiver(&self) -> &Receiver<Arc<Mutex<JoyConDevice>>> {
-        &self.new_device_receiver
+    pub fn new_devices(&self) -> crossbeam_channel::Receiver<Arc<Mutex<JoyConDevice>>> {
+        self.new_devices.clone()
     }
 }
 

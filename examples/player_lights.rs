@@ -1,18 +1,28 @@
+#![allow(unused_must_use)]
+
 use joycon_rs::prelude::{*, lights::*};
 
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
-    JoyConManager::new()?
-        .lock()
-        .unwrap()
-        .connected_devices()
-        .iter()
-        .try_for_each::<_,JoyConResult<()>>(|d| {
-            let mut driver = SimpleJoyConDriver::new(d)?;
+
+    let manager = JoyConManager::new()?;
+    let (managed_devices, new_devices) = {
+        let lock = manager.lock();
+        match lock {
+            Ok(manager) =>
+                (manager.managed_devices(), manager.new_devices()),
+            Err(_) => unreachable!(),
+        }
+    };
+
+    managed_devices.into_iter()
+        .chain(new_devices)
+        .try_for_each::<_, JoyConResult<()>>(|d| {
+            let mut driver = SimpleJoyConDriver::new(&d)?;
 
             let lights_status = LightsStatus {
-                light_up: vec![LightUp::LED1,LightUp::LED2],
-                flash: vec![Flash::LED0,Flash::LED3]
+                light_up: vec![LightUp::LED1, LightUp::LED2],
+                flash: vec![Flash::LED0, Flash::LED3],
             };
 
             // Set player lights

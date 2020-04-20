@@ -33,14 +33,25 @@
 //! use joycon_rs::prelude::*;
 //!
 //! let (tx, rx) = std::sync::mpsc::channel();
+//! let _output = std::thread::spawn( move || {
+//!     while let Ok(update) = rx.recv() {
+//!         dbg!(update);
+//!     }
+//! });
 //!
-//! JoyConManager::new()
-//!     .unwrap()
-//!     .lock()
-//!     .unwrap()
-//!     .connected_devices()
-//!     .iter()
-//!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
+//! let manager = JoyConManager::new().unwrap();
+//!
+//! let (managed_devices, new_devices) = {
+//!     let lock = manager.lock();
+//!     match lock {
+//!         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+//!         Err(_) => return,
+//!     }
+//! };
+//!
+//! managed_devices.into_iter()
+//!     .chain(new_devices)
+//!     .flat_map(|dev| SimpleJoyConDriver::new(&dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|driver| {
 //!         // Change JoyCon to Simple hid mode.
 //!         let simple_hid_mode = SimpleHIDMode::new(driver)?;
@@ -58,29 +69,45 @@
 //!         Ok(())
 //!     })
 //!     .unwrap();
-//!
-//! // Receive reports from threads
-//! while let Ok(report) = rx.recv() {
-//!     // Output report
-//!     dbg!(report);
-//! }
 //! ```
 //!
-//! ### Ser player lights
+//! ### Set player lights
 //! Then, lets deal with player lights.
 //!
 //! ```no_run
 //! use joycon_rs::prelude::{*, lights::*};
+//! use joycon_rs::joycon::input_report_mode::StandardInputReport;
+//! use joycon_rs::joycon::input_report_mode::sub_command_mode::SubCommandReport;
 //!
-//! let (tx, rx) = std::sync::mpsc::channel();
+//! let (tx, rx) =
+//!     std::sync::mpsc::channel::<JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>>();
 //!
-//! JoyConManager::new()
-//!     .unwrap()
-//!     .lock()
-//!     .unwrap()
-//!     .connected_devices()
-//!     .iter()
-//!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
+//! // Receive status of player lights
+//! std::thread::spawn(move ||{
+//!     while let Ok(Ok(light_status)) = rx.recv() {
+//!         assert_eq!(
+//!             light_status.extra.reply,
+//!             LightsStatus {
+//!                 light_up: vec![LightUp::LED1, LightUp::LED3],
+//!                 flash: vec![Flash::LED0, Flash::LED2],
+//!             }
+//!         )
+//!     }
+//! });
+//!
+//! let manager = JoyConManager::new().unwrap();
+//!
+//! let (managed_devices, new_devices) = {
+//!     let lock = manager.lock();
+//!     match lock {
+//!         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+//!         Err(_) => return,
+//!     }
+//! };
+//!
+//! managed_devices.into_iter()
+//!     .chain(new_devices)
+//!     .flat_map(|dev| SimpleJoyConDriver::new(&dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|mut driver| {
 //!         // Set player lights
 //!         // [SL BUTTON] 📸💡📸💡 [SR BUTTON]
@@ -89,17 +116,6 @@
 //!         Ok(())
 //!     })
 //!     .unwrap();
-//!
-//! // Receive status of player lights
-//! while let Ok(Ok(light_status)) = rx.recv() {
-//!     assert_eq!(
-//!         light_status.extra.reply,
-//!         LightsStatus {
-//!             light_up: vec![LightUp::LED1, LightUp::LED3],
-//!             flash: vec![Flash::LED0, Flash::LED2],
-//!         }
-//!     )
-//! }
 //! ```
 //!
 //! # Features
@@ -137,6 +153,7 @@ doctest!("../README.md");
 
 pub mod prelude {
     pub use hidapi::*;
+    pub use crossbeam_channel;
     pub use crate::result::*;
     pub use crate::joycon::*;
 }

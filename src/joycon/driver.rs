@@ -209,22 +209,28 @@ mod global_packet_number {
 /// If you're not happy with this implementation, you can use `JoyConDriver` trait.
 ///
 /// # Examples
-/// ```
+/// ```no_run
 /// use joycon_rs::prelude::{JoyConManager, SimpleJoyConDriver, lights::*};
 /// use joycon_rs::result::JoyConResult;
 ///
 /// let manager = JoyConManager::new().unwrap();
-/// let mut simple_joycon_drivers = manager.lock()
-///     .unwrap()
-///     .connected_devices()
-///     .iter()
-///     .flat_map(|joycon_device| SimpleJoyConDriver::new(joycon_device))
-///     .collect::<Vec<SimpleJoyConDriver>>();
 ///
-/// // set player's lights
-/// simple_joycon_drivers.iter_mut()
-///     .try_for_each::<_, JoyConResult<()>>(|driver| {
+/// let (managed_devices, new_devices) = {
+///     let lock = manager.lock();
+///     match lock {
+///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+///         Err(_) => return,
+///     }
+/// };
+///
+/// managed_devices.into_iter()
+///     .chain(new_devices)
+///     .try_for_each::<_,JoyConResult<()>>(|device| {
+///         let mut driver = SimpleJoyConDriver::new(&device)?;
+///
+///         // set player's lights
 ///         driver.set_player_lights(&vec![SimpleJoyConDriver::LIGHT_UP[0]], &vec![])?;
+///
 ///         Ok(())
 ///     })
 ///     .unwrap();
@@ -1066,14 +1072,25 @@ pub mod input_report_mode {
         /// use joycon_rs::prelude::*;
         ///
         /// let (sender, receiver) = std::sync::mpsc::channel();
+        /// let _output = std::thread::spawn( move || {
+        ///     while let Ok(update) = receiver.recv() {
+        ///         dbg!(update);
+        ///     }
+        /// });
         ///
-        /// JoyConManager::new()
-        ///     .unwrap()
-        ///     .lock()
-        ///     .unwrap()
-        ///     .connected_devices()
-        ///     .iter()
-        ///     .flat_map(|j| SimpleJoyConDriver::new(j))
+        /// let manager = JoyConManager::new().unwrap();
+        ///
+        /// let (managed_devices, new_devices) = {
+        ///     let lock = manager.lock();
+        ///     match lock {
+        ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+        ///         Err(_) => return,
+        ///     }
+        /// };
+        ///
+        /// managed_devices.into_iter()
+        ///     .chain(new_devices)
+        ///     .flat_map(|device| SimpleJoyConDriver::new(&device))
         ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
         ///         let sender = sender.clone();
         ///
@@ -1090,12 +1107,6 @@ pub mod input_report_mode {
         ///         Ok(())
         ///     })
         ///     .unwrap();
-        ///
-        /// // Receive all Joy-Con's standard full reports
-        /// while let Ok(standard_full_report) = receiver.recv() {
-        ///     // Output reports
-        ///     dbg!(standard_full_report);
-        /// }
         /// ```
         pub struct StandardFullMode<D: JoyConDriver> {
             driver: D,
@@ -1300,13 +1311,25 @@ pub mod input_report_mode {
         ///
         /// let (sender, receiver) = std::sync::mpsc::channel();
         ///
-        /// JoyConManager::new()
-        ///     .unwrap()
-        ///     .lock()
-        ///     .unwrap()
-        ///     .connected_devices()
-        ///     .iter()
-        ///     .flat_map(|d| SimpleJoyConDriver::new(d))
+        /// // Receive all Joy-Con's simple HID reports
+        /// while let Ok(simple_hid_report) = receiver.recv() {
+        ///     // Output reports
+        ///     dbg!(simple_hid_report);
+        /// }
+        ///
+        /// let manager = JoyConManager::new().unwrap();
+        ///
+        /// let (managed_devices, new_devices) = {
+        ///     let lock = manager.lock();
+        ///     match lock {
+        ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+        ///         Err(_) => return,
+        ///     }
+        /// };
+        ///
+        /// managed_devices.into_iter()
+        ///     .chain(new_devices)
+        ///     .flat_map(|d| SimpleJoyConDriver::new(&d))
         ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
         ///         let sender = sender.clone();
         ///
@@ -1319,15 +1342,10 @@ pub mod input_report_mode {
         ///                       .unwrap();
         ///             }
         ///         });
+        ///
         ///         Ok(())
         ///     })
         ///     .unwrap();
-        ///
-        /// // Receive all Joy-Con's simple HID reports
-        /// while let Ok(simple_hid_report) = receiver.recv() {
-        ///     // Output reports
-        ///     dbg!(simple_hid_report);
-        /// }
         /// ```
         pub struct SimpleHIDMode<D: JoyConDriver> {
             driver: D,
@@ -1378,14 +1396,14 @@ pub mod input_report_mode {
 /// ```no_run
 /// use joycon_rs::prelude::{*, lights::*};
 ///
-/// let mut joycon_driver = JoyConManager::new()
-///     .unwrap()
-///     .lock()
-///     .unwrap()
-///     .connected_devices()
-///     .iter()
-///     .flat_map(|d| SimpleJoyConDriver::new(d))
-///     .next().unwrap();
+/// let manager = JoyConManager::new().unwrap();
+///
+/// let device = manager.lock()
+///                     .unwrap()
+///                     .managed_devices()
+///                     .remove(0);
+///
+/// let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
 ///
 /// // Set player lights lightning and flashing.
 /// joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
@@ -1484,15 +1502,14 @@ pub mod lights {
         /// use joycon_rs::prelude::{*, lights::*};
         ///
         /// // some code omitted
-        ///
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .lock()
-        /// #     .unwrap()
-        /// #     .connected_devices()
-        /// #     .iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// joycon_driver.set_player_lights(&vec![LightUp::LED0],&vec![]).unwrap();
         /// ```
         ///
@@ -1504,14 +1521,14 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .lock()
-        /// #     .unwrap()
-        /// #     .connected_devices()
-        /// #     .iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
         /// ```
         ///
@@ -1525,14 +1542,14 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .lock()
-        /// #     .unwrap()
-        /// #     .connected_devices()
-        /// #     .iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// joycon_driver.set_player_lights(&vec![LightUp::LED1], &vec![Flash::LED1]).unwrap();
         /// ```
         ///
@@ -1567,14 +1584,14 @@ pub mod lights {
         /// ```no_run
         /// use joycon_rs::prelude::{*, lights::*};
         ///
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .lock()
-        /// #     .unwrap()
-        /// #     .connected_devices()
-        /// #     .iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// let player_lights_status = joycon_driver.get_player_lights()
         ///     .unwrap()
         ///     .extra;
