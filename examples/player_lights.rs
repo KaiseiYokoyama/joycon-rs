@@ -1,11 +1,14 @@
 #![allow(unused_must_use)]
 
 use joycon_rs::prelude::{*, lights::*};
+use std::convert::TryInto;
+use std::ops::Deref;
 
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
 
-    let manager = JoyConManager::new()?;
+    let manager =
+        JoyConManager::new()?;
     let (managed_devices, new_devices) = {
         let lock = manager.lock();
         match lock {
@@ -17,6 +20,17 @@ fn main() -> JoyConResult<()> {
 
     managed_devices.into_iter()
         .chain(new_devices)
+        .inspect(|d| {
+            let lock = d.lock();
+            let device = match lock {
+                Ok(device) => device,
+                Err(e) => e.into_inner(),
+            };
+            let hid_device: JoyConResult<&HidDevice> = device.deref().try_into();
+            if let Ok(hid_device) = hid_device {
+                println!("{:?}", hid_device.get_product_string())
+            }
+        })
         .try_for_each::<_, JoyConResult<()>>(|d| {
             let mut driver = SimpleJoyConDriver::new(&d)?;
 
