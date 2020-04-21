@@ -1,14 +1,14 @@
 use super::*;
-use crate::joycon::{
-    driver::device_info::{JoyConDeviceInfo, JoyConMacAddress},
-    input_report_mode::sub_command_mode::SubCommandReplyData,
-};
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::Duration;
 use std::thread::JoinHandle;
 use std::option::Option::Some;
+use crate::joycon::device::is_joycon;
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct JoyConSerialNumber(pub String);
 
 /// A manager for dealing with Joy-Cons.
 ///
@@ -18,7 +18,8 @@ use std::option::Option::Some;
 ///
 /// [`JoyConManager::with_duration()`]: #method.with_duration
 pub struct JoyConManager {
-    devices: HashMap<JoyConMacAddress, Arc<Mutex<JoyConDevice>>>,
+    devices: HashMap<JoyConSerialNumber, Arc<Mutex<JoyConDevice>>>,
+    hid_api: Option<HidApi>,
     scanner: Option<JoinHandle<()>>,
     scan_interval: Duration,
     new_devices: crossbeam_channel::Receiver<Arc<Mutex<JoyConDevice>>>,
@@ -31,15 +32,14 @@ impl JoyConManager {
     }
 
     pub fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
-        let scanner = None;
-        let scan_cycle = interval;
         let (tx, rx) = crossbeam_channel::bounded(0);
 
         let manager = {
             let mut manager = JoyConManager {
                 devices: HashMap::new(),
-                scanner,
-                scan_interval: scan_cycle,
+                hid_api: None,
+                scanner: None,
+                scan_interval: interval,
                 new_devices: rx,
             };
 
@@ -91,81 +91,110 @@ impl JoyConManager {
     /// Scan the JoyCon connected to your computer.
     /// This returns new Joy-Cons.
     pub fn scan(&mut self) -> JoyConResult<Vec<Arc<Mutex<JoyConDevice>>>> {
-        let hidapi = HidApi::new()?;
-        let mut devices = hidapi.device_list()
-            .flat_map(|di| JoyConDevice::new(di, &hidapi))
-            .map(|device| Arc::new(Mutex::new(device)))
-            .flat_map::<JoyConResult<(JoyConMacAddress, Arc<Mutex<JoyConDevice>>)>, _>(|device| {
-                let mut driver = SimpleJoyConDriver::new(&device)?;
-                let mac_address = JoyConDeviceInfo::once(&mut driver)?
-                    .extra
-                    .reply
-                    .mac_address;
-                Ok((mac_address, device))
+        let hid_api = if let Some(hidapi) = &mut self.hid_api {
+            // refresh
+            hidapi.refresh_devices()?;
+            hidapi
+        } else {
+            // initialize
+            self.hid_api = Some(HidApi::new()?);
+            match &mut self.hid_api {
+                Some(hid_api) => hid_api,
+                None => unreachable!(),
+            }
+        };
+
+        let previous_device_serials = self.devices.keys()
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        let detected_device_serials = hid_api.device_list()
+            .filter(|&device_info| is_joycon(device_info).is_ok())
+            .flat_map(|device_info|
+                device_info.serial_number()
+                    .map(|s| s.to_string())
+                    .map(JoyConSerialNumber)
+            )
+            .collect::<HashSet<_>>();
+
+        let mut detected_devices = hid_api.device_list()
+            .filter(|&device_info| is_joycon(device_info).is_ok())
+            .flat_map(|di| {
+                let serial_number = di.serial_number()
+                    .map(|s| s.to_string())
+                    .map(JoyConSerialNumber)?;
+                let device = JoyConDevice::new(di, hid_api).ok()?;
+                Some((serial_number, device))
             })
-            .collect::<HashMap<_, _>>();
+            .map(|(serial, device)| (serial,Arc::new(Mutex::new(device))))
+            .collect::<HashMap<_,_>>();
 
-        let old_devices = &self.devices;
+        // removed
+        {
+            let removed_keys = previous_device_serials.difference(&detected_device_serials);
+            removed_keys.for_each(|key| {
+                self.devices
+                    .get(&key)
+                    .map(|device| {
+                        let mut device = match device.lock() {
+                            Ok(d) => d,
+                            Err(e) => e.into_inner()
+                        };
 
-        let keys = devices.keys().cloned().collect::<HashSet<_>>();
-        let old_keys = old_devices.keys().cloned().collect::<HashSet<_>>();
-
-        let removed_keys = old_keys.difference(&keys);
-        removed_keys.for_each(|key| {
-            self.devices
-                .get(&key)
-                .map(|device| {
-                    let mut device = match device.lock() {
-                        Ok(d) => d,
-                        Err(e) => e.into_inner()
-                    };
-
-                    *device = JoyConDevice::Disconnected;
-                });
-        });
-
-        let may_reconnected_keys = old_keys.intersection(&keys);
-        may_reconnected_keys
-            .filter(|k| {
-                if let Some(device) = old_devices.get(k) {
-                    !match device.lock() {
-                        Ok(d) => d,
-                        Err(d) => d.into_inner(),
-                    }.is_connected()
-                } else {
-                    unreachable!()
-                }
-            })
-            .for_each(|k| {
-                if let (Some(device), Some(new_device)) = (self.devices.get(k), devices.remove(k)) {
-                    let mut device = match device.lock() {
-                        Ok(d) => d,
-                        Err(e) => e.into_inner()
-                    };
-
-                    let new_device = {
-                        if let Ok(new_device) = Arc::try_unwrap(new_device) {
-                            match new_device.into_inner() {
-                                Ok(d) => d,
-                                Err(e) => e.into_inner()
-                            }
-                        } else { unreachable!() }
-                    };
-
-                    *device = new_device;
-                } else { unreachable!() }
+                        *device = JoyConDevice::Disconnected;
+                    });
             });
+        }
+
+        // reconnected
+        {
+            let reconnected_keys = previous_device_serials.intersection(&detected_device_serials)
+                .into_iter()
+                .filter(|&k| {
+                    if let Some(device) = self.devices.get(k) {
+                        !match device.lock() {
+                            Ok(d) => d,
+                            Err(d) => d.into_inner(),
+                        }.is_connected()
+                    } else {
+                        unreachable!()
+                    }
+                }).collect::<HashSet<_>>();
+            reconnected_keys.iter()
+                .for_each(|&k| {
+                    if let (Some(device), Some(new_device)) = (self.devices.get(k), detected_devices.remove(k)) {
+                        let mut device = match device.lock() {
+                            Ok(d) => d,
+                            Err(e) => e.into_inner()
+                        };
+
+                        let new_device = {
+                            if let Ok(new_device) = Arc::try_unwrap(new_device) {
+                                match new_device.into_inner() {
+                                    Ok(d) => d,
+                                    Err(e) => e.into_inner()
+                                }
+                            } else { unreachable!() }
+                        };
+
+                        *device = new_device;
+                    } else { unreachable!() }
+                });
+        }
 
         let mut new_devices = Vec::new();
-        let added_keys = keys.difference(&old_keys);
-        added_keys.for_each(|key| {
-            if let Some(device) = devices.remove(key) {
-                let device_cloned = Arc::clone(&device);
-                new_devices.push(device_cloned);
+        // Connected
+        {
+            let connected_keys = detected_device_serials.difference(&previous_device_serials);
+            connected_keys.for_each(|key| {
+                if let Some(device) = detected_devices.remove(key) {
+                    let device_cloned = Arc::clone(&device);
+                    new_devices.push(device_cloned);
 
-                self.devices.insert(key.clone(), device);
-            }
-        });
+                    self.devices.insert(key.clone(), device);
+                }
+            });
+        }
 
         Ok(new_devices)
     }

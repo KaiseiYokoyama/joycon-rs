@@ -166,7 +166,7 @@ pub mod result {
     pub enum JoyConError {
         HidApiError(hidapi::HidError),
         // SubCommandError(SubCommand),
-        SubCommandError(u8),
+        SubCommandError(u8, Vec<u8>),
         JoyConDeviceError(JoyConDeviceError),
         JoyConReportError(JoyConReportError),
         Disconnected,

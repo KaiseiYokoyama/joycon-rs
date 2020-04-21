@@ -1,6 +1,18 @@
 use super::*;
 use std::convert::TryInto;
 
+
+pub fn is_joycon(device_info: &DeviceInfo) -> JoyConResult<()> {
+    if device_info.vendor_id() != JoyConDevice::VENDOR_ID {
+        Err(JoyConDeviceError::InvalidVendorID(device_info.vendor_id()))?;
+    }
+
+    match device_info.product_id() {
+        JoyConDevice::PRODUCT_ID_JOYCON_L | JoyConDevice::PRODUCT_ID_JOYCON_R => Ok(()),
+        other => Err(JoyConDeviceError::InvalidProductID(other))?,
+    }
+}
+
 pub enum JoyConDevice {
     Connected(HidDevice),
     Disconnected,
@@ -12,17 +24,14 @@ impl JoyConDevice {
     pub const PRODUCT_ID_JOYCON_R: u16 = 8199;
 
     pub fn new(device_info: &DeviceInfo, hidapi: &HidApi) -> JoyConResult<Self> {
-        if device_info.vendor_id() != Self::VENDOR_ID {
-            Err(JoyConDeviceError::InvalidVendorID(device_info.vendor_id()))?;
-        }
+        is_joycon(device_info)?;
 
-        let device = device_info.open_device(&hidapi)?;
-
-        match device_info.product_id() {
-            Self::PRODUCT_ID_JOYCON_L => Ok(JoyConDevice::Connected(device)),
-            Self::PRODUCT_ID_JOYCON_R => Ok(JoyConDevice::Connected(device)),
-            other => Err(JoyConDeviceError::InvalidProductID(other))?,
-        }
+        let serial = device_info.serial_number().unwrap_or("");
+        let device = hidapi.open_serial(device_info.vendor_id(),
+                                        device_info.product_id(),
+                                        serial)?;
+        // let device = device_info.open_device(&hidapi)?;
+        Ok(JoyConDevice::Connected(device))
     }
 
     pub fn write(&self, data: &[u8]) -> JoyConResult<usize> {
