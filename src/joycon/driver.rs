@@ -274,6 +274,9 @@ impl SimpleJoyConDriver {
 }
 
 pub trait JoyConDriver {
+    /// If a sub-command is sent and no ACK packet is returned, tread again for the number of times of this value.
+    const ACK_TRY: usize = 5;
+
     /// Send command to Joy-Con
     fn write(&self, data: &[u8]) -> JoyConResult<usize>;
 
@@ -308,18 +311,20 @@ pub trait JoyConDriver {
         self.write(&buf)?;
 
         // check reply
-        let mut buf = [0u8; 362];
-        self.read(&mut buf)?;
-        let ack_byte = AckByte::from(buf[13]);
+        std::iter::repeat(())
+            .take(Self::ACK_TRY)
+            .flat_map(|()| {
+                let mut buf = [0u8; 362];
+                self.read(&mut buf).ok()?;
+                let ack_byte = AckByte::from(buf[13]);
 
-        match ack_byte {
-            AckByte::Ack { .. } => {
-                Ok(buf)
-            }
-            AckByte::Nack => {
-                Err(JoyConError::SubCommandError(sub_command))
-            }
-        }
+                match ack_byte {
+                    AckByte::Ack {..} => Some(buf),
+                    AckByte::Nack => None
+                }
+            })
+            .next()
+            .ok_or(JoyConError::SubCommandError(sub_command, Vec::new()))
     }
 
     /// Send sub-command, and data (sub-command's arguments) with u8 integers
@@ -1565,16 +1570,7 @@ pub mod lights {
                 .sum::<u8>();
 
             let reply = self.send_sub_command(SubCommand::SetPlayerLights, &[arg])?;
-            let ack_byte = reply[13];
-
-            match AckByte::from(ack_byte) {
-                AckByte::Ack { .. } => {
-                    Ok(reply)
-                }
-                AckByte::Nack => {
-                    Err(JoyConError::SubCommandError(SubCommand::SetPlayerLights as u8))
-                }
-            }
+            Ok(reply)
         }
 
         /// Get status of player lights on controller.
@@ -1619,14 +1615,14 @@ pub mod device_info {
     }
 
     impl TryFrom<u8> for JoyConDeviceKind {
-        type Error = JoyConError;
+        type Error = ();
 
         fn try_from(value: u8) -> Result<Self, Self::Error> {
             let kind = match value {
                 0 => JoyConDeviceKind::JoyConL,
                 1 => JoyConDeviceKind::JoyConR,
                 2 => JoyConDeviceKind::ProCon,
-                _ => Err(JoyConError::SubCommandError(SubCommand::RequestDeviceInfo as u8))?
+                _ => Err(())?
             };
 
             Ok(kind)
@@ -1649,7 +1645,10 @@ pub mod device_info {
 
         fn try_from(value: [u8; 35]) -> Result<Self, Self::Error> {
             let firmware_version = u16::from_be_bytes([value[0], value[1]]);
-            let device_kind = JoyConDeviceKind::try_from(value[2])?;
+            let device_kind = JoyConDeviceKind::try_from(value[2])
+                .map_err(|()| {
+                    JoyConError::SubCommandError(SubCommand::RequestDeviceInfo as u8, value.to_vec())
+                })?;
             let mac_address = {
                 let mut buf = [0u8; 6];
                 buf.copy_from_slice(&value[4..10]);
