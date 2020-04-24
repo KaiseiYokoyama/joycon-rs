@@ -126,9 +126,9 @@
 //!     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.][StandardFullMode<D>]
 //!     - [Get status of Joy-Con][SubCommandMode<D, RD>]
 //! - [Deal with LED (Player lights)]
+//! - [Rumble]
 //!
 //! ## Planning
-//! - Vibration (Rumble)
 //! - Receive NFC/IR data
 //! - Deal with HOME light
 //!
@@ -142,6 +142,7 @@
 //! [StandardFullMode<D>]: joycon/input_report_mode/standard_full_mode/struct.StandardFullMode.html
 //! [SubCommandMode<D, RD>]: joycon/input_report_mode/sub_command_mode/struct.SubCommandMode.html
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
+//! [Rumble]:joycon/struct.Rumble.html
 pub mod joycon;
 
 #[cfg(doctest)]
