@@ -60,6 +60,117 @@ pub enum Rotation {
     Landscape,
 }
 
+/// Rumble data for vibration.
+/// * frequency - 0.0 < freq < 1252.0
+/// * amplitude - 0.0 < amp < 1.799.0
+///
+/// c.f. `examples/rumble.rs`
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rumble {
+    frequency: f32,
+    amplitude: f32,
+}
+
+impl Rumble {
+    pub fn frequency(&self) -> f32 {
+        self.frequency
+    }
+
+    pub fn amplitude(&self) -> f32 {
+        self.amplitude
+    }
+
+    /// Constructor of Rumble.
+    /// If arguments not in line with constraints, args will be saturated.
+    pub fn new(freq: f32, amp: f32) -> Self {
+        let freq = if freq < 0.0 {
+            0.0
+        } else if freq > 1252.0 {
+            1252.0
+        } else {
+            freq
+        };
+
+        let amp = if amp < 0.0 {
+            0.0
+        } else if amp > 1.799 {
+            1.799
+        } else {
+            amp
+        };
+
+        Self {
+            frequency: freq,
+            amplitude: amp,
+        }
+    }
+
+    /// The amplitudes over 1.003 are not safe for the integrity of the linear resonant actuators.
+    pub fn is_safe(&self) -> bool {
+        self.amplitude < 1.003
+    }
+
+    /// Generates stopper of rumbling.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use joycon_rs::prelude::*;
+    /// # let mut rumbling_controller_driver: SimpleJoyConDriver;
+    /// // Make JoyCon stop rambling.
+    /// rumbling_controller_driver.rumble((Some(Rumble::stop()),Some(Rumble::stop()))).unwrap();
+    /// ```
+    pub fn stop() -> Self {
+        Self {
+            frequency: 0.0,
+            amplitude: 0.0,
+        }
+    }
+}
+
+impl Into<[u8; 4]> for Rumble {
+    fn into(self) -> [u8; 4] {
+        let encoded_hex_freq = f32::round(f32::log2(self.frequency / 10.0) * 32.0) as u8;
+
+        let hf_freq: u16 = (encoded_hex_freq as u16).saturating_sub(0x60) * 4;
+        let lf_freq: u8 = encoded_hex_freq.saturating_sub(0x40);
+
+        let encoded_hex_amp = if self.amplitude > 0.23 {
+            f32::round(f32::log2(self.amplitude * 8.7) * 32.0) as u8
+        } else if self.amplitude > 0.12 {
+            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+        } else {
+            // todo study
+            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+        };
+
+        let hf_amp: u16 = {
+            let hf_amp: u16 = (encoded_hex_freq as u16 - 0x60) * 4;
+            if hf_amp > 0x01FC {
+                0x01FC
+            } else { hf_amp }
+        }; // encoded_hex_amp<<1;
+        let lf_amp: u8 = {
+            let lf_amp = encoded_hex_amp / 2 + 64;
+            if lf_amp > 0x7F {
+                0x7F
+            } else { lf_amp }
+        };      // (encoded_hex_amp>>1)+0x40;
+
+        let mut buf = [0u8; 4];
+
+        // HF: Byte swapping
+        buf[0] = (hf_freq & 0xFF) as u8;
+        // buf[1] = (hf_amp + ((hf_freq >> 8) & 0xFF)) as u8; //Add amp + 1st byte of frequency to amplitude byte
+        buf[1] = (hf_amp + (hf_freq.wrapping_shr(8) & 0xFF)) as u8; //Add amp + 1st byte of frequency to amplitude byte
+
+        // LF: Byte swapping
+        buf[2] = lf_freq.saturating_add(lf_amp.wrapping_shr(8) & 0xFF);
+        buf[3] = lf_amp & 0xFF;
+
+        buf
+    }
+}
+
 pub mod joycon_features {
     /// Features on Joy-Cons which needs to set up.
     /// ex. IMU(6-Axis sensor), NFC/IR, Vibration
@@ -241,6 +352,7 @@ pub struct SimpleJoyConDriver {
     pub joycon: Arc<Mutex<JoyConDevice>>,
     /// rotation of controller
     pub rotation: Rotation,
+    rumble: (Option<Rumble>, Option<Rumble>),
     enabled_features: HashSet<JoyConFeature>,
     /// Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
     global_packet_number: GlobalPacketNumber,
@@ -255,6 +367,7 @@ impl SimpleJoyConDriver {
         let mut driver = Self {
             joycon: Arc::clone(joycon),
             rotation: Rotation::Portrait,
+            rumble: (None, None),
             enabled_features: HashSet::new(),
             global_packet_number: GlobalPacketNumber::default(),
         };
@@ -289,11 +402,21 @@ pub trait JoyConDriver {
     /// Increase global packet number. Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
     fn increase_global_packet_number(&mut self);
 
+    /// Set rumble status.
+    fn set_rumble_status(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>));
+
+    /// Set rumble status and send rumble command to JoyCon.
+    fn rumble(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>)) -> JoyConResult<usize> {
+        self.set_rumble_status(rumble_l_r);
+        self.send_command_raw(Command::Rumble as u8, 0, &[])
+    }
+
+    /// Get rumble status.
+    fn get_rumble_status(&self) -> (Option<Rumble>, Option<Rumble>);
+
     /// Send command, sub-command, and data (sub-command's arguments) with u8 integers
     /// This returns ACK packet for the command or Error.
-    fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
-        use input_report_mode::sub_command_mode::AckByte;
-
+    fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<usize> {
         let mut buf = [0x0; 0x40];
         // set command
         buf[0] = command;
@@ -302,13 +425,32 @@ pub trait JoyConDriver {
         // increase packet number
         self.increase_global_packet_number();
 
+        // rumble
+        let (rumble_l, rumble_r) = self.get_rumble_status();
+        if let Some(rumble_l) = rumble_l {
+            let rumble_left: [u8; 4] = rumble_l.into();
+            buf[2..6].copy_from_slice(&rumble_left);
+        }
+        if let Some(rumble_r) = rumble_r {
+            let rumble_right: [u8; 4] = rumble_r.into();
+            buf[6..10].copy_from_slice(&rumble_right);
+        }
+
         // set sub command
         buf[10] = sub_command;
         // set data
         buf[11..11 + data.len()].copy_from_slice(data);
 
         // send command
-        self.write(&buf)?;
+        self.write(&buf)
+    }
+
+    /// Send sub-command, and data (sub-command's arguments) with u8 integers
+    /// This returns ACK packet for the command or Error.
+    fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
+        use input_report_mode::sub_command_mode::AckByte;
+
+        self.send_command_raw(1, sub_command, data)?;
 
         // check reply
         std::iter::repeat(())
@@ -319,7 +461,7 @@ pub trait JoyConDriver {
                 let ack_byte = AckByte::from(buf[13]);
 
                 match ack_byte {
-                    AckByte::Ack {..} => Some(buf),
+                    AckByte::Ack { .. } => Some(buf),
                     AckByte::Nack => None
                 }
             })
@@ -327,15 +469,9 @@ pub trait JoyConDriver {
             .ok_or(JoyConError::SubCommandError(sub_command, Vec::new()))
     }
 
-    /// Send sub-command, and data (sub-command's arguments) with u8 integers
-    /// This returns ACK packet for the command or Error.
-    fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
-        self.send_command_raw(1, sub_command, data)
-    }
-
     /// Send command, sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
-    fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
+    fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
         let command = command as u8;
         let sub_command = sub_command as u8;
 
@@ -345,7 +481,7 @@ pub trait JoyConDriver {
     /// Send sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
     fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
-        self.send_command(Command::RumbleAndSubCommand, sub_command, data)
+        self.send_sub_command_raw(sub_command as u8, data)
     }
 
     /// Initialize Joy-Con's status
@@ -384,6 +520,14 @@ impl JoyConDriver for SimpleJoyConDriver {
 
     fn increase_global_packet_number(&mut self) {
         self.global_packet_number = self.global_packet_number.next();
+    }
+
+    fn set_rumble_status(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>)) {
+        self.rumble = rumble_l_r;
+    }
+
+    fn get_rumble_status(&self) -> (Option<Rumble>, Option<Rumble>) {
+        self.rumble
     }
 
     fn enable_feature(&mut self, feature: JoyConFeature) -> JoyConResult<()> {
