@@ -1,7 +1,9 @@
 use super::*;
+use std::convert::TryFrom;
 use std::collections::HashSet;
 pub use global_packet_number::GlobalPacketNumber;
 pub use joycon_features::{JoyConFeature, IMUConfig};
+use std::sync::{Mutex, MutexGuard};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Rotation {
@@ -56,6 +58,148 @@ pub enum Rotation {
     ///   `              _7XwvrrrrrrrrrrrrrrrrrrrrrrrrrrrrrtrrrrrrrrrrrrrrrrrwwXV=
     ///                      _?7777777777777777777777777777777777777OOOOO77=!(=`
     Landscape,
+}
+
+/// Rumble data for vibration.
+///
+/// # Notice
+/// Constraints exist.
+/// * frequency - 0.0 < freq < 1252.0
+/// * amplitude - 0.0 < amp < 1.799.0
+///
+/// # Example
+/// ```no_run
+/// use joycon_rs::prelude::{*, joycon_features::JoyConFeature};
+///
+/// let manager = JoyConManager::new().unwrap();
+/// let (managed_devices, new_devices) = {
+///     let lock = manager.lock();
+///     match lock {
+///         Ok(manager) =>
+///             (manager.managed_devices(), manager.new_devices()),
+///         Err(_) => unreachable!(),
+///     }
+/// };
+///
+/// managed_devices.into_iter()
+///     .chain(new_devices)
+///     .try_for_each::<_, JoyConResult<()>>(|d| {
+///         let mut driver = SimpleJoyConDriver::new(&d)?;
+///
+///         driver.enable_feature(JoyConFeature::Vibration)?;
+///
+///         let rumble = Rumble::new(300.0,0.9);
+///         // ₍₍(ง˘ω˘)ว⁾⁾ Rumble! ₍₍(ง˘ω˘)ว⁾⁾
+///         driver.rumble((Some(rumble), Some(rumble)))?;
+///
+///         Ok(())
+///     })
+///     .unwrap();
+///```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rumble {
+    frequency: f32,
+    amplitude: f32,
+}
+
+impl Rumble {
+    pub fn frequency(&self) -> f32 {
+        self.frequency
+    }
+
+    pub fn amplitude(&self) -> f32 {
+        self.amplitude
+    }
+
+    /// Constructor of Rumble.
+    /// If arguments not in line with constraints, args will be saturated.
+    pub fn new(freq: f32, amp: f32) -> Self {
+        let freq = if freq < 0.0 {
+            0.0
+        } else if freq > 1252.0 {
+            1252.0
+        } else {
+            freq
+        };
+
+        let amp = if amp < 0.0 {
+            0.0
+        } else if amp > 1.799 {
+            1.799
+        } else {
+            amp
+        };
+
+        Self {
+            frequency: freq,
+            amplitude: amp,
+        }
+    }
+
+    /// The amplitudes over 1.003 are not safe for the integrity of the linear resonant actuators.
+    pub fn is_safe(&self) -> bool {
+        self.amplitude < 1.003
+    }
+
+    /// Generates stopper of rumbling.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use joycon_rs::prelude::*;
+    /// # let mut rumbling_controller_driver: SimpleJoyConDriver;
+    /// // Make JoyCon stop rambling.
+    /// rumbling_controller_driver.rumble((Some(Rumble::stop()),Some(Rumble::stop()))).unwrap();
+    /// ```
+    pub fn stop() -> Self {
+        Self {
+            frequency: 0.0,
+            amplitude: 0.0,
+        }
+    }
+}
+
+impl Into<[u8; 4]> for Rumble {
+    fn into(self) -> [u8; 4] {
+        let encoded_hex_freq = f32::round(f32::log2(self.frequency / 10.0) * 32.0) as u8;
+
+        let hf_freq: u16 = (encoded_hex_freq as u16).saturating_sub(0x60) * 4;
+        let lf_freq: u8 = encoded_hex_freq.saturating_sub(0x40);
+
+        let encoded_hex_amp = if self.amplitude > 0.23 {
+            f32::round(f32::log2(self.amplitude * 8.7) * 32.0) as u8
+        } else if self.amplitude > 0.12 {
+            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+        } else {
+            // todo study
+            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+        };
+
+        let hf_amp: u16 = {
+            let hf_amp: u16 = (encoded_hex_freq as u16 - 0x60) * 4;
+            if hf_amp > 0x01FC {
+                0x01FC
+            } else { hf_amp }
+        }; // encoded_hex_amp<<1;
+        let lf_amp: u8 = {
+            let lf_amp = encoded_hex_amp / 2 + 64;
+            if lf_amp > 0x7F {
+                0x7F
+            } else { lf_amp }
+        };      // (encoded_hex_amp>>1)+0x40;
+
+        let mut buf = [0u8; 4];
+
+        // HF: Byte swapping
+        buf[0] = (hf_freq & 0xFF) as u8;
+        // buf[1] = (hf_amp + ((hf_freq >> 8) & 0xFF)) as u8; //Add amp + 1st byte of frequency to amplitude byte
+        buf[1] = (hf_amp + (hf_freq.wrapping_shr(8) & 0xFF)) as u8; //Add amp + 1st byte of frequency to amplitude byte
+
+        // LF: Byte swapping
+        buf[2] = lf_freq.saturating_add(lf_amp.wrapping_shr(8) & 0xFF);
+        buf[3] = lf_amp & 0xFF;
+
+        buf
+    }
 }
 
 pub mod joycon_features {
@@ -207,19 +351,28 @@ mod global_packet_number {
 /// If you're not happy with this implementation, you can use `JoyConDriver` trait.
 ///
 /// # Examples
-/// ```
+/// ```no_run
 /// use joycon_rs::prelude::{JoyConManager, SimpleJoyConDriver, lights::*};
 /// use joycon_rs::result::JoyConResult;
 ///
 /// let manager = JoyConManager::new().unwrap();
-/// let mut simple_joycon_drivers = manager.connected_joycon_devices.into_iter()
-///     .flat_map(|joycon_device| SimpleJoyConDriver::new(joycon_device))
-///     .collect::<Vec<SimpleJoyConDriver>>();
 ///
-/// // set player's lights
-/// simple_joycon_drivers.iter_mut()
-///     .try_for_each::<_, JoyConResult<()>>(|driver| {
+/// let (managed_devices, new_devices) = {
+///     let lock = manager.lock();
+///     match lock {
+///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+///         Err(_) => return,
+///     }
+/// };
+///
+/// managed_devices.into_iter()
+///     .chain(new_devices)
+///     .try_for_each::<_,JoyConResult<()>>(|device| {
+///         let mut driver = SimpleJoyConDriver::new(&device)?;
+///
+///         // set player's lights
 ///         driver.set_player_lights(&vec![SimpleJoyConDriver::LIGHT_UP[0]], &vec![])?;
+///
 ///         Ok(())
 ///     })
 ///     .unwrap();
@@ -227,9 +380,10 @@ mod global_packet_number {
 #[derive(Debug)]
 pub struct SimpleJoyConDriver {
     /// The controller user uses
-    pub joycon: JoyConDevice,
+    pub joycon: Arc<Mutex<JoyConDevice>>,
     /// rotation of controller
     pub rotation: Rotation,
+    rumble: (Option<Rumble>, Option<Rumble>),
     enabled_features: HashSet<JoyConFeature>,
     /// Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
     global_packet_number: GlobalPacketNumber,
@@ -237,13 +391,14 @@ pub struct SimpleJoyConDriver {
 
 impl SimpleJoyConDriver {
     /// Constructs a new `SimpleJoyConDriver`.
-    pub fn new(joycon: JoyConDevice) -> JoyConResult<Self> {
+    pub fn new(joycon: &Arc<Mutex<JoyConDevice>>) -> JoyConResult<Self> {
         // joycon.set_blocking_mode(true);
         // joycon.set_blocking_mode(false);
 
         let mut driver = Self {
-            joycon,
+            joycon: Arc::clone(joycon),
             rotation: Rotation::Portrait,
+            rumble: (None, None),
             enabled_features: HashSet::new(),
             global_packet_number: GlobalPacketNumber::default(),
         };
@@ -252,9 +407,20 @@ impl SimpleJoyConDriver {
 
         Ok(driver)
     }
+
+    pub fn joycon(&self) -> MutexGuard<JoyConDevice> {
+        // todo error handling
+        match self.joycon.lock() {
+            Ok(joycon) => joycon,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
 }
 
 pub trait JoyConDriver {
+    /// If a sub-command is sent and no ACK packet is returned, tread again for the number of times of this value.
+    const ACK_TRY: usize = 5;
+
     /// Send command to Joy-Con
     fn write(&self, data: &[u8]) -> JoyConResult<usize>;
 
@@ -267,11 +433,21 @@ pub trait JoyConDriver {
     /// Increase global packet number. Increment by 1 for each packet sent. It loops in 0x0 - 0xF range.
     fn increase_global_packet_number(&mut self);
 
+    /// Set rumble status.
+    fn set_rumble_status(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>));
+
+    /// Set rumble status and send rumble command to JoyCon.
+    fn rumble(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>)) -> JoyConResult<usize> {
+        self.set_rumble_status(rumble_l_r);
+        self.send_command_raw(Command::Rumble as u8, 0, &[])
+    }
+
+    /// Get rumble status.
+    fn get_rumble_status(&self) -> (Option<Rumble>, Option<Rumble>);
+
     /// Send command, sub-command, and data (sub-command's arguments) with u8 integers
     /// This returns ACK packet for the command or Error.
-    fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
-        use input_report_mode::sub_command_mode::AckByte;
-
+    fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<usize> {
         let mut buf = [0x0; 0x40];
         // set command
         buf[0] = command;
@@ -280,38 +456,53 @@ pub trait JoyConDriver {
         // increase packet number
         self.increase_global_packet_number();
 
+        // rumble
+        let (rumble_l, rumble_r) = self.get_rumble_status();
+        if let Some(rumble_l) = rumble_l {
+            let rumble_left: [u8; 4] = rumble_l.into();
+            buf[2..6].copy_from_slice(&rumble_left);
+        }
+        if let Some(rumble_r) = rumble_r {
+            let rumble_right: [u8; 4] = rumble_r.into();
+            buf[6..10].copy_from_slice(&rumble_right);
+        }
+
         // set sub command
         buf[10] = sub_command;
         // set data
         buf[11..11 + data.len()].copy_from_slice(data);
 
         // send command
-        self.write(&buf)?;
-
-        // check reply
-        let mut buf = [0u8; 362];
-        self.read(&mut buf)?;
-        let ack_byte = AckByte::from(buf[13]);
-
-        match ack_byte {
-            AckByte::Ack { .. } => {
-                Ok(buf)
-            }
-            AckByte::Nack => {
-                Err(JoyConError::SubCommandError(sub_command))
-            }
-        }
+        self.write(&buf)
     }
 
     /// Send sub-command, and data (sub-command's arguments) with u8 integers
     /// This returns ACK packet for the command or Error.
     fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
-        self.send_command_raw(1, sub_command, data)
+        use input_report_mode::sub_command_mode::AckByte;
+
+        self.send_command_raw(1, sub_command, data)?;
+
+        // check reply
+        std::iter::repeat(())
+            .take(Self::ACK_TRY)
+            .flat_map(|()| {
+                let mut buf = [0u8; 362];
+                self.read(&mut buf).ok()?;
+                let ack_byte = AckByte::from(buf[13]);
+
+                match ack_byte {
+                    AckByte::Ack { .. } => Some(buf),
+                    AckByte::Nack => None
+                }
+            })
+            .next()
+            .ok_or(JoyConError::SubCommandError(sub_command, Vec::new()))
     }
 
     /// Send command, sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
-    fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
+    fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
         let command = command as u8;
         let sub_command = sub_command as u8;
 
@@ -321,7 +512,7 @@ pub trait JoyConDriver {
     /// Send sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
     fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
-        self.send_command(Command::RumbleAndSubCommand, sub_command, data)
+        self.send_sub_command_raw(sub_command as u8, data)
     }
 
     /// Initialize Joy-Con's status
@@ -341,16 +532,17 @@ pub trait JoyConDriver {
     fn enabled_features(&self) -> &HashSet<JoyConFeature>;
 
     /// Get Joy-Con devices deal with.
-    fn devices(&self) -> Vec<&JoyConDevice>;
+    fn devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>>;
 }
 
 impl JoyConDriver for SimpleJoyConDriver {
     fn write(&self, data: &[u8]) -> JoyConResult<usize> {
-        Ok(self.joycon.write(data)?)
+        let joycon = self.joycon();
+        Ok(joycon.write(data)?)
     }
 
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
-        Ok(self.joycon.read(buf)?)
+        Ok(self.joycon().read(buf)?)
     }
 
     fn global_packet_number(&self) -> u8 {
@@ -359,6 +551,14 @@ impl JoyConDriver for SimpleJoyConDriver {
 
     fn increase_global_packet_number(&mut self) {
         self.global_packet_number = self.global_packet_number.next();
+    }
+
+    fn set_rumble_status(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>)) {
+        self.rumble = rumble_l_r;
+    }
+
+    fn get_rumble_status(&self) -> (Option<Rumble>, Option<Rumble>) {
+        self.rumble
     }
 
     fn enable_feature(&mut self, feature: JoyConFeature) -> JoyConResult<()> {
@@ -385,8 +585,8 @@ impl JoyConDriver for SimpleJoyConDriver {
         &self.enabled_features
     }
 
-    fn devices(&self) -> Vec<&JoyConDevice> {
-        vec![&self.joycon]
+    fn devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>> {
+        vec![Arc::clone(&self.joycon)]
     }
 }
 
@@ -751,7 +951,7 @@ pub mod input_report_mode {
     }
 
     impl<EX> Hash for StandardInputReport<EX>
-        where EX: TryFrom<[u8; 349], Error = JoyConError> + Hash
+        where EX: TryFrom<[u8; 349], Error=JoyConError> + Hash
     {
         fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
             self.common.hash(state);
@@ -1052,12 +1252,25 @@ pub mod input_report_mode {
         /// use joycon_rs::prelude::*;
         ///
         /// let (sender, receiver) = std::sync::mpsc::channel();
+        /// let _output = std::thread::spawn( move || {
+        ///     while let Ok(update) = receiver.recv() {
+        ///         dbg!(update);
+        ///     }
+        /// });
         ///
-        /// JoyConManager::new()
-        ///     .unwrap()
-        ///     .connected_joycon_devices
-        ///     .into_iter()
-        ///     .flat_map(|j| SimpleJoyConDriver::new(j))
+        /// let manager = JoyConManager::new().unwrap();
+        ///
+        /// let (managed_devices, new_devices) = {
+        ///     let lock = manager.lock();
+        ///     match lock {
+        ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+        ///         Err(_) => return,
+        ///     }
+        /// };
+        ///
+        /// managed_devices.into_iter()
+        ///     .chain(new_devices)
+        ///     .flat_map(|device| SimpleJoyConDriver::new(&device))
         ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
         ///         let sender = sender.clone();
         ///
@@ -1074,12 +1287,6 @@ pub mod input_report_mode {
         ///         Ok(())
         ///     })
         ///     .unwrap();
-        ///
-        /// // Receive all Joy-Con's standard full reports
-        /// while let Ok(standard_full_report) = receiver.recv() {
-        ///     // Output reports
-        ///     dbg!(standard_full_report);
-        /// }
         /// ```
         pub struct StandardFullMode<D: JoyConDriver> {
             driver: D,
@@ -1284,11 +1491,25 @@ pub mod input_report_mode {
         ///
         /// let (sender, receiver) = std::sync::mpsc::channel();
         ///
-        /// JoyConManager::new()
-        ///     .unwrap()
-        ///     .connected_joycon_devices
-        ///     .into_iter()
-        ///     .flat_map(|d| SimpleJoyConDriver::new(d))
+        /// // Receive all Joy-Con's simple HID reports
+        /// while let Ok(simple_hid_report) = receiver.recv() {
+        ///     // Output reports
+        ///     dbg!(simple_hid_report);
+        /// }
+        ///
+        /// let manager = JoyConManager::new().unwrap();
+        ///
+        /// let (managed_devices, new_devices) = {
+        ///     let lock = manager.lock();
+        ///     match lock {
+        ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+        ///         Err(_) => return,
+        ///     }
+        /// };
+        ///
+        /// managed_devices.into_iter()
+        ///     .chain(new_devices)
+        ///     .flat_map(|d| SimpleJoyConDriver::new(&d))
         ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
         ///         let sender = sender.clone();
         ///
@@ -1301,15 +1522,10 @@ pub mod input_report_mode {
         ///                       .unwrap();
         ///             }
         ///         });
+        ///
         ///         Ok(())
         ///     })
         ///     .unwrap();
-        ///
-        /// // Receive all Joy-Con's simple HID reports
-        /// while let Ok(simple_hid_report) = receiver.recv() {
-        ///     // Output reports
-        ///     dbg!(simple_hid_report);
-        /// }
         /// ```
         pub struct SimpleHIDMode<D: JoyConDriver> {
             driver: D,
@@ -1360,12 +1576,14 @@ pub mod input_report_mode {
 /// ```no_run
 /// use joycon_rs::prelude::{*, lights::*};
 ///
-/// let mut joycon_driver = JoyConManager::new()
-///     .unwrap()
-///     .connected_joycon_devices
-///     .into_iter()
-///     .flat_map(|d| SimpleJoyConDriver::new(d))
-///     .next().unwrap();
+/// let manager = JoyConManager::new().unwrap();
+///
+/// let device = manager.lock()
+///                     .unwrap()
+///                     .managed_devices()
+///                     .remove(0);
+///
+/// let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
 ///
 /// // Set player lights lightning and flashing.
 /// joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
@@ -1378,7 +1596,6 @@ pub mod input_report_mode {
 /// ```
 pub mod lights {
     use super::{*, input_report_mode::sub_command_mode::*};
-    use std::convert::TryFrom;
     use crate::joycon::driver::input_report_mode::StandardInputReport;
 
     /// LED to keep on lightning up / lightning
@@ -1465,13 +1682,14 @@ pub mod lights {
         /// use joycon_rs::prelude::{*, lights::*};
         ///
         /// // some code omitted
-        ///
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .connected_joycon_devices
-        /// #     .into_iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// joycon_driver.set_player_lights(&vec![LightUp::LED0],&vec![]).unwrap();
         /// ```
         ///
@@ -1483,12 +1701,14 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .connected_joycon_devices
-        /// #     .into_iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
         /// ```
         ///
@@ -1502,12 +1722,14 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .connected_joycon_devices
-        /// #     .into_iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// joycon_driver.set_player_lights(&vec![LightUp::LED1], &vec![Flash::LED1]).unwrap();
         /// ```
         ///
@@ -1523,16 +1745,7 @@ pub mod lights {
                 .sum::<u8>();
 
             let reply = self.send_sub_command(SubCommand::SetPlayerLights, &[arg])?;
-            let ack_byte = reply[13];
-
-            match AckByte::from(ack_byte) {
-                AckByte::Ack { .. } => {
-                    Ok(reply)
-                }
-                AckByte::Nack => {
-                    Err(JoyConError::SubCommandError(SubCommand::SetPlayerLights as u8))
-                }
-            }
+            Ok(reply)
         }
 
         /// Get status of player lights on controller.
@@ -1542,12 +1755,14 @@ pub mod lights {
         /// ```no_run
         /// use joycon_rs::prelude::{*, lights::*};
         ///
-        /// # let mut joycon_driver = JoyConManager::new()
-        /// #     .unwrap()
-        /// #     .connected_joycon_devices
-        /// #     .into_iter()
-        /// #     .flat_map(|d| SimpleJoyConDriver::new(d))
-        /// #     .next().unwrap();
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
         /// let player_lights_status = joycon_driver.get_player_lights()
         ///     .unwrap()
         ///     .extra;
@@ -1562,6 +1777,74 @@ pub mod lights {
     }
 
     impl<D> Lights for D where D: JoyConDriver {}
+}
+
+pub mod device_info {
+    use super::{*, input_report_mode::sub_command_mode::*};
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    pub enum JoyConDeviceKind {
+        JoyConR = 0,
+        JoyConL = 1,
+        ProCon = 2,
+    }
+
+    impl TryFrom<u8> for JoyConDeviceKind {
+        type Error = ();
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
+            let kind = match value {
+                0 => JoyConDeviceKind::JoyConL,
+                1 => JoyConDeviceKind::JoyConR,
+                2 => JoyConDeviceKind::ProCon,
+                _ => Err(())?
+            };
+
+            Ok(kind)
+        }
+    }
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    pub struct JoyConMacAddress(pub [u8; 6]);
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    pub struct JoyConDeviceInfo {
+        pub firmware_version: u16,
+        pub device_kind: JoyConDeviceKind,
+        pub mac_address: JoyConMacAddress,
+        pub colors_in_spi: bool,
+    }
+
+    impl TryFrom<[u8; 35]> for JoyConDeviceInfo {
+        type Error = JoyConError;
+
+        fn try_from(value: [u8; 35]) -> Result<Self, Self::Error> {
+            let firmware_version = u16::from_be_bytes([value[0], value[1]]);
+            let device_kind = JoyConDeviceKind::try_from(value[2])
+                .map_err(|()| {
+                    JoyConError::SubCommandError(SubCommand::RequestDeviceInfo as u8, value.to_vec())
+                })?;
+            let mac_address = {
+                let mut buf = [0u8; 6];
+                buf.copy_from_slice(&value[4..10]);
+                JoyConMacAddress(buf)
+            };
+            let colors_in_spi = value[12] == 1;
+
+            Ok(JoyConDeviceInfo {
+                firmware_version,
+                device_kind,
+                mac_address,
+                colors_in_spi,
+            })
+        }
+    }
+
+    impl SubCommandReplyData for JoyConDeviceInfo {
+        type ArgsType = [u8; 0];
+        const SUB_COMMAND: SubCommand = SubCommand::RequestDeviceInfo;
+        const ARGS: Self::ArgsType = [];
+    }
 }
 
 #[allow(non_camel_case_types)]

@@ -1,5 +1,4 @@
 #![doc(html_logo_url = "https://user-images.githubusercontent.com/8509057/79100490-9a4a7900-7da1-11ea-9ee4-5e15439bbd0c.png")]
-
 //! # Joycon-rs Library Documentation
 //!
 //! Hello, and welcome to joycon-rs documentation.
@@ -34,12 +33,25 @@
 //! use joycon_rs::prelude::*;
 //!
 //! let (tx, rx) = std::sync::mpsc::channel();
+//! let _output = std::thread::spawn( move || {
+//!     while let Ok(update) = rx.recv() {
+//!         dbg!(update);
+//!     }
+//! });
 //!
-//! JoyConManager::new()
-//!     .unwrap()
-//!     .connected_joycon_devices
-//!     .into_iter()
-//!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
+//! let manager = JoyConManager::new().unwrap();
+//!
+//! let (managed_devices, new_devices) = {
+//!     let lock = manager.lock();
+//!     match lock {
+//!         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+//!         Err(_) => return,
+//!     }
+//! };
+//!
+//! managed_devices.into_iter()
+//!     .chain(new_devices)
+//!     .flat_map(|dev| SimpleJoyConDriver::new(&dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|driver| {
 //!         // Change JoyCon to Simple hid mode.
 //!         let simple_hid_mode = SimpleHIDMode::new(driver)?;
@@ -57,27 +69,45 @@
 //!         Ok(())
 //!     })
 //!     .unwrap();
-//!
-//! // Receive reports from threads
-//! while let Ok(report) = rx.recv() {
-//!     // Output report
-//!     dbg!(report);
-//! }
 //! ```
 //!
-//! ### Ser player lights
+//! ### Set player lights
 //! Then, lets deal with player lights.
 //!
 //! ```no_run
 //! use joycon_rs::prelude::{*, lights::*};
+//! use joycon_rs::joycon::input_report_mode::StandardInputReport;
+//! use joycon_rs::joycon::input_report_mode::sub_command_mode::SubCommandReport;
 //!
-//! let (tx, rx) = std::sync::mpsc::channel();
+//! let (tx, rx) =
+//!     std::sync::mpsc::channel::<JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>>();
 //!
-//! JoyConManager::new()
-//!     .unwrap()
-//!     .connected_joycon_devices
-//!     .into_iter()
-//!     .flat_map(|dev| SimpleJoyConDriver::new(dev))
+//! // Receive status of player lights
+//! std::thread::spawn(move ||{
+//!     while let Ok(Ok(light_status)) = rx.recv() {
+//!         assert_eq!(
+//!             light_status.extra.reply,
+//!             LightsStatus {
+//!                 light_up: vec![LightUp::LED1, LightUp::LED3],
+//!                 flash: vec![Flash::LED0, Flash::LED2],
+//!             }
+//!         )
+//!     }
+//! });
+//!
+//! let manager = JoyConManager::new().unwrap();
+//!
+//! let (managed_devices, new_devices) = {
+//!     let lock = manager.lock();
+//!     match lock {
+//!         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+//!         Err(_) => return,
+//!     }
+//! };
+//!
+//! managed_devices.into_iter()
+//!     .chain(new_devices)
+//!     .flat_map(|dev| SimpleJoyConDriver::new(&dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|mut driver| {
 //!         // Set player lights
 //!         // [SL BUTTON] 📸💡📸💡 [SR BUTTON]
@@ -86,17 +116,6 @@
 //!         Ok(())
 //!     })
 //!     .unwrap();
-//!
-//! // Receive status of player lights
-//! while let Ok(Ok(light_status)) = rx.recv() {
-//!     assert_eq!(
-//!         light_status.extra.reply,
-//!         LightsStatus {
-//!             light_up: vec![LightUp::LED1, LightUp::LED3],
-//!             flash: vec![Flash::LED0, Flash::LED2],
-//!         }
-//!     )
-//! }
 //! ```
 //!
 //! # Features
@@ -107,9 +126,9 @@
 //!     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.][StandardFullMode<D>]
 //!     - [Get status of Joy-Con][SubCommandMode<D, RD>]
 //! - [Deal with LED (Player lights)]
+//! - [Rumble]
 //!
 //! ## Planning
-//! - Vibration (Rumble)
 //! - Receive NFC/IR data
 //! - Deal with HOME light
 //!
@@ -123,10 +142,19 @@
 //! [StandardFullMode<D>]: joycon/input_report_mode/standard_full_mode/struct.StandardFullMode.html
 //! [SubCommandMode<D, RD>]: joycon/input_report_mode/sub_command_mode/struct.SubCommandMode.html
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
+//! [Rumble]:joycon/struct.Rumble.html
 pub mod joycon;
+
+#[cfg(doctest)]
+#[macro_use]
+extern crate doc_comment;
+
+#[cfg(doctest)]
+doctest!("../README.md");
 
 pub mod prelude {
     pub use hidapi::*;
+    pub use crossbeam_channel;
     pub use crate::result::*;
     pub use crate::joycon::*;
 }
@@ -139,9 +167,10 @@ pub mod result {
     pub enum JoyConError {
         HidApiError(hidapi::HidError),
         // SubCommandError(SubCommand),
-        SubCommandError(u8),
+        SubCommandError(u8, Vec<u8>),
         JoyConDeviceError(JoyConDeviceError),
         JoyConReportError(JoyConReportError),
+        Disconnected,
     }
 
     impl From<hidapi::HidError> for JoyConError {

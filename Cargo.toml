@@ -1,6 +1,6 @@
 [package]
 name = "joycon-rs"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Kaisei Yokoyama <yokoyama.kaisei.sm@alumni.tsukuba.ac.jp>"]
 edition = "2018"
 description = " a framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently"
@@ -11,7 +11,11 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hidapi = "1.2.1"
+hidapi = { git = "https://github.com/KaiseiYokoyama/hidapi-rs" }
+crossbeam-channel = "0.4.2"
+
+[dev-dependencies]
+doc-comment = "0.3.3"
 
 [[example]]
 name = "scan_for_joycons"
@@ -24,3 +28,6 @@ name = "standard_full_report"
 
 [[example]]
 name = "simple_hid_report"
+
+[[example]]
+name = "rumble"

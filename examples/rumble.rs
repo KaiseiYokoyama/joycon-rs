@@ -1,8 +1,7 @@
-#![allow(unused_must_use)]
-
-use joycon_rs::prelude::{*, lights::*};
+use joycon_rs::prelude::*;
 use std::convert::TryInto;
 use std::ops::Deref;
+use joycon_rs::joycon::joycon_features::JoyConFeature;
 
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
@@ -34,18 +33,11 @@ fn main() -> JoyConResult<()> {
         .try_for_each::<_, JoyConResult<()>>(|d| {
             let mut driver = SimpleJoyConDriver::new(&d)?;
 
-            let lights_status = LightsStatus {
-                light_up: vec![LightUp::LED1, LightUp::LED2],
-                flash: vec![Flash::LED0, Flash::LED3],
-            };
+            driver.enable_feature(JoyConFeature::Vibration)?;
 
-            // Set player lights
-            driver.set_player_lights(&lights_status.light_up, &lights_status.flash)?;
-
-            // Get player lights
-            let lights_status_received = driver.get_player_lights()?.extra.reply;
-
-            assert_eq!(lights_status_received, lights_status);
+            // let rumble = Rumble::new(80.0,0.2);
+            let rumble = Rumble::new(300.0,0.9);
+            driver.rumble((Some(rumble), Some(rumble)))?;
 
             Ok(())
         })?;
