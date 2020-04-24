@@ -3,6 +3,8 @@ use crate::prelude::*;
 pub use device::JoyConDevice;
 pub use driver::{
     Rotation,
+    Rumble,
+    joycon_features,
     JoyConDriver,
     GlobalPacketNumber,
     SimpleJoyConDriver,
