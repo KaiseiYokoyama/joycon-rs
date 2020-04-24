@@ -28,3 +28,6 @@ name = "standard_full_report"
 
 [[example]]
 name = "simple_hid_report"
+
+[[example]]
+name = "rumble"
