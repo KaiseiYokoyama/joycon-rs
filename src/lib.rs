@@ -120,13 +120,15 @@
 //!
 //! # Features
 //! You can use `Joycon-rs` for...
+//! - Manage Joy-Cons
+//!    - Connection / Disconnection / Reconnection
 //! - [Send] / [Receive] raw packets (u8 array) to / from Joy-Con
 //! - [Receive input to Joy-Con][input_report_mode]
 //!     - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.][SimpleHIDMode<D>]
 //!     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.][StandardFullMode<D>]
 //!     - [Get status of Joy-Con][SubCommandMode<D, RD>]
 //! - [Deal with LED (Player lights)]
-//! - [Rumble]
+//! - [Vibration (Rumble)]
 //!
 //! ## Planning
 //! - Receive NFC/IR data
@@ -142,7 +144,7 @@
 //! [StandardFullMode<D>]: joycon/input_report_mode/standard_full_mode/struct.StandardFullMode.html
 //! [SubCommandMode<D, RD>]: joycon/input_report_mode/sub_command_mode/struct.SubCommandMode.html
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
-//! [Rumble]:joycon/struct.Rumble.html
+//! [Vibration (Rumble)]:joycon/struct.Rumble.html
 pub mod joycon;
 
 #[cfg(doctest)]
