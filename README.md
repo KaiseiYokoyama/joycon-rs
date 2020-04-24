@@ -123,18 +123,19 @@ managed_devices.into_iter()
 
  # Features
  You can use `Joycon-rs` for...
+ - Manage Joy-Cons
+     - Connection / Disconnection / Reconnection
  - Send / Receive raw packets (u8 array) to / from Joy-Con
  - Receive input to Joy-Con
      - Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.
      - Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.
      - Get status of Joy-Con
  - Deal with LED (Player lights)
+ - Vibration (Rumble)
 
  ## Planning
- - Vibration (Rumble)
  - Receive NFC/IR data
  - Deal with HOME light
  - Deal with Pro Controller
- - Disconnect / Reconnect
  
 [`mspc`]: https://doc.rust-lang.org/book/ch16-02-message-passing.html
