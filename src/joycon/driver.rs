@@ -1974,6 +1974,29 @@ pub mod lights {
             LightsStatus::once(self)
         }
 
+        /// Set HOME light.
+        ///
+        /// # Example
+        /// ```no_run
+        /// use joycon_rs::prelude::{*, lights::{*, home_button::*}};
+        ///
+        /// # let manager = JoyConManager::new().unwrap();
+        /// #
+        /// # let device = manager.lock()
+        /// #                     .unwrap()
+        /// #                     .managed_devices()
+        /// #                     .remove(0);
+        /// #
+        /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
+        /// let pattern =
+        ///     // loop pattern forever
+        ///     LightEmittingPattern::new(100, 0, 0u8.into())
+        ///         // 0.5 seconds to light up
+        ///         .add_phase(100,500,0)
+        ///         // 0.5 seconds to turn off
+        ///         .add_phase(0,500,0);
+        /// let player_lights_status = joycon_driver.set_home_light(&pattern);
+        /// ```
         fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<[u8; 362]> {
             let arg: [u8;25] = pattern.clone().into();
             self.send_sub_command(SubCommand::SetHOMELight, &arg)
