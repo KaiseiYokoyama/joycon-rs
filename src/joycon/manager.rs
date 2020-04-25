@@ -5,7 +5,6 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::thread::JoinHandle;
 use std::option::Option::Some;
-use crate::joycon::device::is_joycon;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct JoyConSerialNumber(pub String);
@@ -109,7 +108,10 @@ impl JoyConManager {
             .collect::<HashSet<_>>();
 
         let detected_device_serials = hid_api.device_list()
-            .filter(|&device_info| is_joycon(device_info).is_ok())
+            .filter(|&device_info|
+                JoyConDevice::check_type_of_device(device_info)
+                    .is_ok()
+            )
             .flat_map(|device_info|
                 device_info.serial_number()
                     .map(|s| s.to_string())
@@ -118,7 +120,10 @@ impl JoyConManager {
             .collect::<HashSet<_>>();
 
         let mut detected_devices = hid_api.device_list()
-            .filter(|&device_info| is_joycon(device_info).is_ok())
+            .filter(|&device_info|
+                JoyConDevice::check_type_of_device(device_info)
+                    .is_ok()
+            )
             .flat_map(|di| {
                 let serial_number = di.serial_number()
                     .map(|s| s.to_string())
@@ -141,7 +146,7 @@ impl JoyConManager {
                             Err(e) => e.into_inner()
                         };
 
-                        *device = JoyConDevice::Disconnected;
+                        device.forget_device();
                     });
             });
         }

@@ -1782,21 +1782,14 @@ pub mod lights {
 pub mod device_info {
     use super::{*, input_report_mode::sub_command_mode::*};
 
-    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-    pub enum JoyConDeviceKind {
-        JoyConR = 0,
-        JoyConL = 1,
-        ProCon = 2,
-    }
-
-    impl TryFrom<u8> for JoyConDeviceKind {
+    impl TryFrom<u8> for JoyConDeviceType {
         type Error = ();
 
         fn try_from(value: u8) -> Result<Self, Self::Error> {
             let kind = match value {
-                0 => JoyConDeviceKind::JoyConL,
-                1 => JoyConDeviceKind::JoyConR,
-                2 => JoyConDeviceKind::ProCon,
+                0 => JoyConDeviceType::JoyConL,
+                1 => JoyConDeviceType::JoyConR,
+                2 => JoyConDeviceType::ProCon,
                 _ => Err(())?
             };
 
@@ -1810,7 +1803,7 @@ pub mod device_info {
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct JoyConDeviceInfo {
         pub firmware_version: u16,
-        pub device_kind: JoyConDeviceKind,
+        pub device_type: JoyConDeviceType,
         pub mac_address: JoyConMacAddress,
         pub colors_in_spi: bool,
     }
@@ -1820,7 +1813,7 @@ pub mod device_info {
 
         fn try_from(value: [u8; 35]) -> Result<Self, Self::Error> {
             let firmware_version = u16::from_be_bytes([value[0], value[1]]);
-            let device_kind = JoyConDeviceKind::try_from(value[2])
+            let device_kind = JoyConDeviceType::try_from(value[2])
                 .map_err(|()| {
                     JoyConError::SubCommandError(SubCommand::RequestDeviceInfo as u8, value.to_vec())
                 })?;
@@ -1833,7 +1826,7 @@ pub mod device_info {
 
             Ok(JoyConDeviceInfo {
                 firmware_version,
-                device_kind,
+                device_type: device_kind,
                 mac_address,
                 colors_in_spi,
             })
