@@ -1973,6 +1973,11 @@ pub mod lights {
         {
             LightsStatus::once(self)
         }
+
+        fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<[u8; 362]> {
+            let arg: [u8;25] = pattern.clone().into();
+            self.send_sub_command(SubCommand::SetHOMELight, &arg)
+        }
     }
 
     impl<D> Lights for D where D: JoyConDriver {}
