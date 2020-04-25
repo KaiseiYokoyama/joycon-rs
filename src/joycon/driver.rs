@@ -1757,20 +1757,20 @@ pub mod lights {
             /// Add emitting phase to pattern.
             ///
             /// * led_intensity (*%*) - 0 <= led_intensity <= 100
-            /// * fading_transition_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration * 15
-            /// * led_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration * 15
-            pub fn add_phase(mut self, led_intensity: u8, fading_transition_duration: u8, led_duration: u8) -> Self {
+            /// * fading_transition_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration (ms) * 15
+            /// * led_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration (ms) * 15
+            pub fn add_phase(mut self, led_intensity: u8, fading_transition_duration: u16, led_duration: u16) -> Self {
                 let led_intensity = {
                     let saturated = if 100 < led_intensity { 100 } else { led_intensity } as f32;
                     ((saturated / 6.25) as u8).into()
                 };
                 let fading_transition_duration: u4 = {
                     let gmcd: u8 = self.global_mini_cycle_duration.into();
-                    fading_transition_duration / gmcd
+                    (fading_transition_duration / gmcd as u16) as u8
                 }.into();
                 let led_duration = {
                     let gmcd: u8 =  self.global_mini_cycle_duration.into();
-                    led_duration / gmcd
+                    (led_duration / gmcd as u16) as u8
                 }.into();
 
                 let phase = LightEmittingPhase {
