@@ -30,7 +30,7 @@ joycon_rs = "*"
 ```
 
 Then, `use` prelude on `.rs` file.
-```
+```rust
 use joycon_rs::prelude::*;
 ```
 
@@ -40,7 +40,7 @@ Perfect! Now you have Joycon-rs available in code.
 For starters, let's take a simple signal from JoyCon.
 If you use more than one JoyCon, [`mspc`] can be very helpful.
 
-```no_run
+```rust no_run
 use joycon_rs::prelude::*;
 
 let (tx, rx) = std::sync::mpsc::channel();
@@ -84,10 +84,10 @@ managed_devices.into_iter()
     .unwrap();
 ```
 
-### Ser player lights
+### Set player lights
 Then, lets deal with player lights.
 
-```no_run
+```rust no_run
 use joycon_rs::prelude::{*, lights::*};
 
 let (tx, rx) = std::sync::mpsc::channel();
@@ -122,7 +122,7 @@ managed_devices.into_iter()
 ```
 
 ### Rumble
-```no_run
+```rust no_run
 use joycon_rs::prelude::*;
 use std::convert::TryInto;
 use std::ops::Deref;
@@ -175,19 +175,19 @@ fn main() -> JoyConResult<()> {
 
  # Features
  You can use `Joycon-rs` for...
- - Manage Joy-Cons
+ - [Manage Joy-Cons](examples/scan_for_joycons.rs)
      - Connection / Disconnection / Reconnection
  - Send / Receive raw packets (u8 array) to / from Joy-Con
  - Receive input to Joy-Con
-     - Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.
-     - Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.
-     - Get status of Joy-Con
- - Deal with LED (Player lights)
- - Vibration (Rumble)
+     - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.](examples/simple_hid_report.rs)
+     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.](examples/standard_full_report.rs)
+     - Get/Set status of Joy-Con
+ - [Deal with LED (Player lights)](examples/player_lights.rs)
+ - [Vibration (Rumble)](examples/rumble.rs)
+ - [HOME Light](examples/home_light.rs)
 
  ## Planning
  - Receive NFC/IR data
- - Deal with HOME light
  - Deal with Pro Controller
  
 [`mspc`]: https://doc.rust-lang.org/book/ch16-02-message-passing.html
