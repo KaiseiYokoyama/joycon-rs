@@ -4,6 +4,7 @@ pub use device::{JoyConDevice, JoyConDeviceType};
 pub use driver::{
     Rotation,
     Rumble,
+    calibration,
     joycon_features,
     JoyConDriver,
     GlobalPacketNumber,

@@ -202,6 +202,122 @@ impl Into<[u8; 4]> for Rumble {
     }
 }
 
+pub mod calibration {
+    pub struct AxisCalibration {
+        max: u16,
+        center: u16,
+        min: u16,
+    }
+
+    impl AxisCalibration {
+        pub fn max(&self) -> u16 {
+            self.max
+        }
+
+        pub fn center(&self) -> u16 {
+            self.center
+        }
+
+        pub fn min(&self) -> u16 {
+            self.min
+        }
+    }
+
+    pub struct StickCalibration {
+        x: AxisCalibration,
+        y: AxisCalibration,
+    }
+
+    impl StickCalibration {
+        pub fn x(&self) -> &AxisCalibration {
+            &self.x
+        }
+
+        pub fn y(&self) -> &AxisCalibration {
+            &self.y
+        }
+    }
+
+    pub struct AnalogStickCalibrations {
+        left: Option<StickCalibration>,
+        right: Option<StickCalibration>,
+    }
+
+    impl From<[u8; 18]> for AnalogStickCalibrations {
+        fn from(stick_cal: [u8; 18]) -> Self {
+            fn stick_cal_to_data(stick_cal: &[u8]) -> [u16; 6] {
+                let mut data = [0u16; 6];
+
+                data[0] = ((stick_cal[1] as u16) << 8) & 0xF00 | stick_cal[0] as u16;
+                data[1] = ((stick_cal[2] as u16) << 4) | ((stick_cal[1] as u16) >> 4);
+                data[2] = ((stick_cal[4] as u16) << 8) & 0xF00 | stick_cal[3] as u16;
+                data[3] = ((stick_cal[5] as u16) << 4) | ((stick_cal[4] as u16) >> 4);
+                data[4] = ((stick_cal[7] as u16) << 8) & 0xF00 | stick_cal[6] as u16;
+                data[5] = ((stick_cal[8] as u16) << 4) | ((stick_cal[7] as u16) >> 4);
+
+                data
+            }
+
+            let left_stick_calibration = {
+                let left_stick_cal = &stick_cal[0..9];
+                if left_stick_cal.iter()
+                    .all(|u| u == &0xF) {
+                    None
+                } else {
+                    let left_stick_data = stick_cal_to_data(&stick_cal[0..9]);
+
+                    let left_stick_calibration =
+                        StickCalibration {
+                            x: AxisCalibration {
+                                center: left_stick_data[2],
+                                max: left_stick_data[2] + left_stick_data[0],
+                                min: left_stick_data[2] - left_stick_data[4],
+                            },
+                            y: AxisCalibration {
+                                center: left_stick_data[3],
+                                max: left_stick_data[3] + left_stick_data[1],
+                                min: left_stick_data[3] - left_stick_data[5],
+                            },
+                        };
+
+                    Some(left_stick_calibration)
+                }
+            };
+
+            let right_stick_calibration = {
+                let right_stick_cal = &stick_cal[9..18];
+                if right_stick_cal.iter()
+                    .all(|u| u == &0xF) {
+                    None
+                } else {
+                    let right_stick_data = stick_cal_to_data(right_stick_cal);
+
+                    let right_stick_calibration =
+                        StickCalibration {
+                            x: AxisCalibration {
+                                center: right_stick_data[0],
+                                max: right_stick_data[0] + right_stick_data[4],
+                                min: right_stick_data[0] - right_stick_data[2],
+                            },
+                            y: AxisCalibration {
+                                center: right_stick_data[1],
+                                max: right_stick_data[1] + right_stick_data[5],
+                                min: right_stick_data[1] - right_stick_data[3],
+                            },
+                        };
+
+                    Some(right_stick_calibration)
+                }
+            };
+
+            AnalogStickCalibrations {
+                left: left_stick_calibration,
+                right: right_stick_calibration,
+            }
+        }
+    }
+}
+
 pub mod joycon_features {
     /// Features on Joy-Cons which needs to set up.
     /// ex. IMU(6-Axis sensor), NFC/IR, Vibration
@@ -1769,7 +1885,7 @@ pub mod lights {
                     (fading_transition_duration / gmcd as u16) as u8
                 }.into();
                 let led_duration = {
-                    let gmcd: u8 =  self.global_mini_cycle_duration.into();
+                    let gmcd: u8 = self.global_mini_cycle_duration.into();
                     (led_duration / gmcd as u16) as u8
                 }.into();
 
@@ -1798,7 +1914,7 @@ pub mod lights {
             fn into(self) -> [u8; 25] {
                 fn nibbles_to_u8(high: u4, low: u4) -> u8 {
                     let high = {
-                        let high :u8 = high.into();
+                        let high: u8 = high.into();
                         (high & 0x0F) << 4
                     };
                     let low = {
@@ -1998,7 +2114,7 @@ pub mod lights {
         /// let player_lights_status = joycon_driver.set_home_light(&pattern);
         /// ```
         fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<[u8; 362]> {
-            let arg: [u8;25] = pattern.clone().into();
+            let arg: [u8; 25] = pattern.clone().into();
             self.send_sub_command(SubCommand::SetHOMELight, &arg)
         }
     }
