@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use device::JoyConDevice;
+pub use device::{JoyConDevice, JoyConDeviceType};
 pub use driver::{
     Rotation,
     Rumble,
