@@ -619,7 +619,6 @@ pub mod input_report_mode {
     pub use common::*;
     pub use self::{sub_command_mode::SubCommandMode, standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
     use std::convert::TryFrom;
-    use std::ops::{Deref, DerefMut};
     use std::hash::Hash;
 
     mod common {
@@ -1109,26 +1108,6 @@ pub mod input_report_mode {
             _phantom: PhantomData<RD>,
         }
 
-        impl<D, RD> Deref for SubCommandMode<D, RD>
-            where D: JoyConDriver,
-                  RD: SubCommandReplyData
-        {
-            type Target = D;
-
-            fn deref(&self) -> &Self::Target {
-                &self.driver
-            }
-        }
-
-        impl<D, RD> DerefMut for SubCommandMode<D, RD>
-            where D: JoyConDriver,
-                  RD: SubCommandReplyData
-        {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.driver
-            }
-        }
-
         impl<D, RD> InputReportMode<D> for SubCommandMode<D, RD>
             where D: JoyConDriver,
                   RD: SubCommandReplyData
@@ -1289,24 +1268,6 @@ pub mod input_report_mode {
         /// ```
         pub struct StandardFullMode<D: JoyConDriver> {
             driver: D,
-        }
-
-        impl<D> Deref for StandardFullMode<D>
-            where D: JoyConDriver
-        {
-            type Target = D;
-
-            fn deref(&self) -> &Self::Target {
-                &self.driver
-            }
-        }
-
-        impl<D> DerefMut for StandardFullMode<D>
-            where D: JoyConDriver
-        {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.driver
-            }
         }
 
         impl<D> InputReportMode<D> for StandardFullMode<D>
@@ -1537,20 +1498,6 @@ pub mod input_report_mode {
         /// ```
         pub struct SimpleHIDMode<D: JoyConDriver> {
             driver: D,
-        }
-
-        impl<D: JoyConDriver> Deref for SimpleHIDMode<D> {
-            type Target = D;
-
-            fn deref(&self) -> &Self::Target {
-                &self.driver
-            }
-        }
-
-        impl<D: JoyConDriver> DerefMut for SimpleHIDMode<D> {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.driver
-            }
         }
 
         impl<D> InputReportMode<D> for SimpleHIDMode<D>
