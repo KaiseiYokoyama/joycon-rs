@@ -12,7 +12,7 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hidapi = { git = "https://github.com/KaiseiYokoyama/hidapi-rs" }
+hidapi-alt-for-hidapi-issue-127 = "1.2.1"
 crossbeam-channel = "0.4.2"
 
 [dev-dependencies]
