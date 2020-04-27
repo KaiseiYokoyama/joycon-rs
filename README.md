@@ -1,4 +1,4 @@
-![joycon-rs](images/joycon-rs.png)
+![joycon-rs](https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/joycon-rs.png)
 
 # Joycon-rs
 ![Test on mac](https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20mac/badge.svg?branch=master)
