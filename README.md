@@ -11,7 +11,7 @@ A framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficien
 Please see the documentation comments for detailed instructions on how to use it.
 
  Joycon-rs is in development and is still incomplete.
- Please be aware that the update will include breaking changes for the time being. Pardon out dust!
+ Please be aware the update will include breaking changes for the time being. Pardon out dust!
 
 # Setup
 On macOS or Windows, there are no preparation.
