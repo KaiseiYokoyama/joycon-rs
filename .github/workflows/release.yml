@@ -4,10 +4,8 @@ on:
   release:
   push:
     types: [published]
-#    branches:
-#       - master
-    branches-ignore:
-        - '**'
+    branches:
+       - master
 
 jobs:
   Release:

@@ -1,4 +1,5 @@
-#![doc(html_logo_url = "https://user-images.githubusercontent.com/8509057/79100490-9a4a7900-7da1-11ea-9ee4-5e15439bbd0c.png")]
+#![doc(html_favicon_url = "https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/favicon.ico")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/logo.png")]
 //! # Joycon-rs Library Documentation
 //!
 //! Hello, and welcome to joycon-rs documentation.
@@ -145,6 +146,8 @@
 //! [SubCommandMode<D, RD>]: joycon/input_report_mode/sub_command_mode/struct.SubCommandMode.html
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
 //! [Vibration (Rumble)]:joycon/struct.Rumble.html
+extern crate hidapi_alt_for_hidapi_issue_127 as hidapi;
+
 pub mod joycon;
 
 #[cfg(doctest)]
