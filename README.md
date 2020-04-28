@@ -21,9 +21,10 @@
     </a>
 </h4>
 <h3 align="center">
-    <a href="https://docs.rs/joycon-rs/0.3.1/joycon_rs/">Documentation</a> | 
-    <a href="https://github.com/KaiseiYokoyama/joycon-rs/tree/master/examples">Examples</a> | 
-    <a href="https://github.com/KaiseiYokoyama/joycon-rs/releases">Changelog</a>
+    <a href="https://docs.rs/joycon-rs/0.3.1/joycon_rs/">Documentation</a><span>|</span>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/tree/master/examples">Examples</a><span>|</span>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/releases">Changelog</a><span>|</span>
+    <a href="https://kaiseiyokoyama.github.io/blog/tags/joycon-rs-v0.3.1/">ドキュメント</a>
 </h3>
 
 A framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently.
