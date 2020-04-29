@@ -203,6 +203,10 @@ impl Into<[u8; 4]> for Rumble {
 }
 
 pub mod calibration {
+    use std::fmt::Debug;
+    use std::hash::Hash;
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct AxisCalibration {
         max: u16,
         center: u16,
@@ -210,19 +214,23 @@ pub mod calibration {
     }
 
     impl AxisCalibration {
+        /// Max above center
         pub fn max(&self) -> u16 {
             self.max
         }
 
+        /// Center
         pub fn center(&self) -> u16 {
             self.center
         }
 
+        /// Min above center
         pub fn min(&self) -> u16 {
             self.min
         }
     }
 
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct StickCalibration {
         x: AxisCalibration,
         y: AxisCalibration,
@@ -238,6 +246,7 @@ pub mod calibration {
         }
     }
 
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct AnalogStickCalibrations {
         left: Option<StickCalibration>,
         right: Option<StickCalibration>,
@@ -313,6 +322,104 @@ pub mod calibration {
             AnalogStickCalibrations {
                 left: left_stick_calibration,
                 right: right_stick_calibration,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct XYZ<T: Debug> {
+        pub x: T,
+        pub y: T,
+        pub z: T,
+    }
+
+    impl<T> Clone for XYZ<T> where T: Debug + Clone {
+        fn clone(&self) -> Self {
+            Self {
+                x: self.x.clone(),
+                y: self.y.clone(),
+                z: self.z.clone(),
+            }
+        }
+    }
+
+    impl<T> Hash for XYZ<T> where T: Debug + Hash {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.x.hash(state);
+            self.y.hash(state);
+            self.z.hash(state);
+        }
+    }
+
+    impl<T> PartialEq for XYZ<T> where T: Debug + PartialEq {
+        fn eq(&self, other: &Self) -> bool {
+            self.x == other.x
+                && self.y == other.y
+                && self.z == other.z
+        }
+    }
+
+    impl<T> Eq for XYZ<T> where T: Debug + Eq {}
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    pub struct IMUCalibration {
+        acc_origin_position: XYZ<i16>,
+        acc_sensitivity_special_coeff: XYZ<i16>,
+        gyro_origin_position: XYZ<i16>,
+        gyro_sensitivity_special_coeff: XYZ<i16>,
+    }
+
+    impl IMUCalibration {
+        /// Acc XYZ origin position when completely horizontal and stick is upside
+        pub fn acc_origin_position(&self) -> &XYZ<i16> {
+            &self.acc_origin_position
+        }
+
+        /// Acc XYZ sensitivity special coeff, for default sensitivity: ±8G.
+        pub fn acc_sensitivity_special_coeff(&self) -> &XYZ<i16> {
+            &self.acc_sensitivity_special_coeff
+        }
+
+        /// Gyro XYZ origin position when still
+        pub fn gyro_origin_position(&self) -> &XYZ<i16> {
+            &self.gyro_origin_position
+        }
+
+        /// Gyro XYZ sensitivity special coeff, for default sensitivity: ±2000dps.
+        pub fn gyro_sensitivity_special_coeff(&self) -> &XYZ<i16> {
+            &self.gyro_sensitivity_special_coeff
+        }
+    }
+
+    impl From<[u8; 24]> for IMUCalibration {
+        fn from(value: [u8; 24]) -> Self {
+            use std::slice::Iter;
+            use std::iter::Cloned;
+
+            fn convert(big: u8, little: u8) -> i16 {
+                i16::from_be_bytes([big, little])
+            }
+
+            fn iter_to_xyz_i16(iter: &mut Cloned<Iter<u8>>) -> XYZ<i16> {
+                let x = convert(iter.next().unwrap(), iter.next().unwrap());
+                let y = convert(iter.next().unwrap(), iter.next().unwrap());
+                let z = convert(iter.next().unwrap(), iter.next().unwrap());
+
+                XYZ { x, y, z }
+            }
+
+            let mut iter = value.iter().cloned();
+
+            let acc_origin_position = iter_to_xyz_i16(&mut iter);
+            let acc_sensitivity_special_coeff = iter_to_xyz_i16(&mut iter);
+            let gyro_origin_position = iter_to_xyz_i16(&mut iter);
+            let gyro_sensitivity_special_coeff = iter_to_xyz_i16(&mut iter);
+
+            Self {
+                acc_origin_position,
+                acc_sensitivity_special_coeff,
+                gyro_origin_position,
+                gyro_sensitivity_special_coeff,
             }
         }
     }
@@ -1235,7 +1342,7 @@ pub mod input_report_mode {
 
             fn new(driver: D) -> JoyConResult<Self> {
                 let mut driver = driver;
-                driver.send_sub_command(Self::SUB_COMMAND,Self::ARGS.as_ref())?;
+                driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
                 Ok(SubCommandMode {
                     driver,
@@ -1407,7 +1514,7 @@ pub mod input_report_mode {
                     driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
                 }
 
-                driver.send_sub_command(Self::SUB_COMMAND,Self::ARGS.as_ref())?;
+                driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
                 Ok(StandardFullMode {
                     driver
