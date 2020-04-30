@@ -2254,6 +2254,55 @@ pub mod device_info {
     }
 }
 
+pub mod spi {
+    use super::{*, input_report_mode::sub_command_mode::*};
+
+    /// Convert i32 address and i8 length to u8 array
+    ///
+    /// # Notice
+    /// ***`Length <= 0x1D`***
+    pub const fn spi_target(address: u32, length: u8) -> [u8;5] {
+        // let address_le_bytes: [u8;4] = address.to_le_bytes();
+        // let length: [u8;1] = if length > 0x1D {
+        //     0x1D
+        // } else {
+        //     length
+        // }.to_le_bytes();
+
+        let address_le_bytes = [
+            (address & 0xFF) as u8,
+            ((address & 0xFF00) >> 8) as u8,
+            ((address & 0xFF0000) >> 16) as u8,
+            ((address & 0xFF000000) >> 24) as u8,
+        ];
+
+        [
+            address_le_bytes[0],
+            address_le_bytes[1],
+            address_le_bytes[2],
+            address_le_bytes[3],
+            length
+        ]
+    }
+
+    #[test]
+    fn test() {
+        let target = spi_target(0x6080,0x18);
+        assert_eq!(target, [0x80,0x60,0x00,0x00,0x18]);
+    }
+
+    pub trait SPIData: TryFrom<[u8;35], Error = JoyConError> {
+        const ADDRESS: u32;
+        const LENGTH: u8;
+    }
+
+    impl<T: SPIData> SubCommandReplyData for T {
+        type ArgsType = [u8; 5];
+        const SUB_COMMAND: SubCommand = SubCommand::SPIFlashRead;
+        const ARGS: Self::ArgsType = spi_target(Self::ADDRESS, Self::LENGTH);
+    }
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Command {

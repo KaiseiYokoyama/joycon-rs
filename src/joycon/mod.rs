@@ -14,6 +14,7 @@ pub use driver::{
     input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode, SubCommandMode},
     lights,
     device_info,
+    spi,
 };
 pub use manager::JoyConManager;
 
