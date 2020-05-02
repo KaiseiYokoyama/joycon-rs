@@ -15,7 +15,10 @@ pub struct JoyConSerialNumber(pub String);
 /// of JoyCon by scanning periodically
 /// (every second: You can set the interval in [`JoyConManager::with_duration()`]).
 ///
+/// You can get instance at [`JoyConManager::get_instance()`].
+///
 /// [`JoyConManager::with_duration()`]: #method.with_duration
+/// [`JoyConManager::get_instance()`]: #method.get_instance
 pub struct JoyConManager {
     devices: HashMap<JoyConSerialNumber, Arc<Mutex<JoyConDevice>>>,
     hid_api: Option<HidApi>,
