@@ -1,9 +1,30 @@
-![joycon-rs](https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/joycon-rs.png)
-
-# Joycon-rs
-![Test on mac](https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20mac/badge.svg?branch=master)
-![Test on windows](https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20windows/badge.svg)
-![Test on ubuntu](https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20ubuntu/badge.svg)
+<h1 align="center">
+    <img align="center" src="https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/joycon-rs.png" width="200"/><br>
+    <a href="https://crates.io/crates/joycon-rs">Joycon-rs</a>
+</h1>
+<h4 align="center">
+    <a href="https://crates.io/crates/joycon-rs"><img src="https://img.shields.io/crates/d/joycon_rs?logo=rust" /></a>
+    <a href="https://crates.io/crates/joycon-rs"><img src="https://img.shields.io/crates/v/joycon_rs?logo=rust" /></a>
+    <a href="https://docs.rs/joycon-rs/0.3.1/joycon_rs/"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat&logo=rust" /></a>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/blob/master/LICENSE"><img src="https://img.shields.io/crates/l/joycon_rs?logo=rust" /></a>
+</h4>
+<h4 align="center">
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions?query=workflow%3A%22Test+on+mac%22">
+        <img src="https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20mac/badge.svg" />
+    </a>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions?query=workflow%3A%22Test+on+windows%22">
+        <img src="https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20windows/badge.svg" />
+    </a>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions?query=workflow%3A%22Test+on+ubuntu%22">
+        <img src="https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20ubuntu/badge.svg" />
+    </a>
+</h4>
+<h3 align="center">
+    <a href="https://docs.rs/joycon-rs/0.3.1/joycon_rs/">Documentation</a><span>|</span>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/tree/master/examples">Examples</a><span>|</span>
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/releases">Changelog</a><span>|</span>
+    <a href="https://kaiseiyokoyama.github.io/blog/tags/joycon-rs-v0.3.1/">ドキュメント</a>
+</h3>
 
 A framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently.
 
@@ -13,7 +34,7 @@ Please see the documentation comments for detailed instructions on how to use it
  Joycon-rs is in development and is still incomplete.
  Please be aware the update will include breaking changes for the time being. Pardon out dust!
 
-# Setup
+## Setup
 On macOS or Windows, there are no preparation.
 
 On linux, 
@@ -21,7 +42,7 @@ On linux,
 $ sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
 ```
 
-# Usage
+## Usage
 First, add dependency to `Cargo.toml`
 
 ```toml
@@ -30,7 +51,7 @@ joycon_rs = "*"
 ```
 
 Then, `use` prelude on `.rs` file.
-```
+```rust
 use joycon_rs::prelude::*;
 ```
 
@@ -40,7 +61,7 @@ Perfect! Now you have Joycon-rs available in code.
 For starters, let's take a simple signal from JoyCon.
 If you use more than one JoyCon, [`mspc`] can be very helpful.
 
-```no_run
+```rust no_run
 use joycon_rs::prelude::*;
 
 let (tx, rx) = std::sync::mpsc::channel();
@@ -84,10 +105,10 @@ managed_devices.into_iter()
     .unwrap();
 ```
 
-### Ser player lights
+### Set player lights
 Then, lets deal with player lights.
 
-```no_run
+```rust no_run
 use joycon_rs::prelude::{*, lights::*};
 
 let (tx, rx) = std::sync::mpsc::channel();
@@ -122,7 +143,7 @@ managed_devices.into_iter()
 ```
 
 ### Rumble
-```no_run
+```rust no_run
 use joycon_rs::prelude::*;
 use std::convert::TryInto;
 use std::ops::Deref;
@@ -173,21 +194,31 @@ fn main() -> JoyConResult<()> {
 ### More Examples
 [Here](examples).
 
- # Features
+ ## Features
  You can use `Joycon-rs` for...
- - Manage Joy-Cons
+ - [Manage Joy-Cons](examples/scan_for_joycons.rs)
      - Connection / Disconnection / Reconnection
  - Send / Receive raw packets (u8 array) to / from Joy-Con
  - Receive input to Joy-Con
-     - Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.
-     - Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.
-     - Get status of Joy-Con
- - Deal with LED (Player lights)
- - Vibration (Rumble)
+     - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.](examples/simple_hid_report.rs)
+     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.](examples/standard_full_report.rs)
+     - Get/Set status of Joy-Con
+ - [Deal with LED (Player lights)](examples/player_lights.rs)
+ - [Vibration (Rumble)](examples/rumble.rs)
+ - [HOME Light](examples/home_light.rs)
 
- ## Planning
+### Planning
  - Receive NFC/IR data
- - Deal with HOME light
  - Deal with Pro Controller
  
+## License
+
+Licensed under Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
+
+## Contribution
+
+We gladly accept contributions via GitHub pull requests. 
+If you find a bug in the library, it would be appreciated if you could report it in detail to [Issues] so that it can be reproduced.
+
+[Issues]: https://github.com/KaiseiYokoyama/joycon-rs/issues
 [`mspc`]: https://doc.rust-lang.org/book/ch16-02-message-passing.html
