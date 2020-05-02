@@ -1101,6 +1101,7 @@ pub mod input_report_mode {
         }
 
         /// Receive standard input report with sub-command's reply.
+        #[deprecated]
         pub struct SubCommandMode<D, RD>
             where D: JoyConDriver, RD: SubCommandReplyData
         {
