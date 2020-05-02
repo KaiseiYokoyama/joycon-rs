@@ -1,7 +1,7 @@
 use super::*;
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Mutex, Once};
 use std::time::Duration;
 use std::thread::JoinHandle;
 use std::option::Option::Some;
@@ -15,7 +15,10 @@ pub struct JoyConSerialNumber(pub String);
 /// of JoyCon by scanning periodically
 /// (every second: You can set the interval in [`JoyConManager::with_duration()`]).
 ///
+/// You can get instance at [`JoyConManager::get_instance()`].
+///
 /// [`JoyConManager::with_duration()`]: #method.with_duration
+/// [`JoyConManager::get_instance()`]: #method.get_instance
 pub struct JoyConManager {
     devices: HashMap<JoyConSerialNumber, Arc<Mutex<JoyConDevice>>>,
     hid_api: Option<HidApi>,
@@ -25,12 +28,32 @@ pub struct JoyConManager {
 }
 
 impl JoyConManager {
+    /// Get `JoyConManager` instance.
+    pub fn get_instance() -> Arc<Mutex<Self>> {
+        static mut SINGLETON: Option<Arc<Mutex<JoyConManager>>> = None;
+        static ONCE: Once = Once::new();
+
+        unsafe {
+            ONCE.call_once(|| {
+                let instance = JoyConManager::new()
+                    .unwrap();
+
+                SINGLETON = Some(instance);
+            });
+
+            match SINGLETON.clone() {
+                Some(manager) => manager,
+                None => unreachable!()
+            }
+        }
+    }
+
     /// Constructor
-    pub fn new() -> JoyConResult<Arc<Mutex<Self>>> {
+    fn new() -> JoyConResult<Arc<Mutex<Self>>> {
         Self::with_interval(std::time::Duration::from_millis(100))
     }
 
-    pub fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
+    fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
         let (tx, rx) = crossbeam_channel::bounded(0);
 
         let manager = {
@@ -87,6 +110,11 @@ impl JoyConManager {
         Ok(manager)
     }
 
+    /// Set scan interval
+    pub fn set_interval(&mut self, interval: Duration) {
+        self.scan_interval = interval;
+    }
+
     /// Scan the JoyCon connected to your computer.
     /// This returns new Joy-Cons.
     pub fn scan(&mut self) -> JoyConResult<Vec<Arc<Mutex<JoyConDevice>>>> {
@@ -131,8 +159,8 @@ impl JoyConManager {
                 let device = JoyConDevice::new(di, hid_api).ok()?;
                 Some((serial_number, device))
             })
-            .map(|(serial, device)| (serial,Arc::new(Mutex::new(device))))
-            .collect::<HashMap<_,_>>();
+            .map(|(serial, device)| (serial, Arc::new(Mutex::new(device))))
+            .collect::<HashMap<_, _>>();
 
         // removed
         {
@@ -229,7 +257,7 @@ impl JoyConManager {
     ///     }
     /// });
     ///
-    /// let manager = JoyConManager::new().unwrap();
+    /// let manager = JoyConManager::get_instance();
     ///
     /// let (managed_devices, new_devices) = {
     ///     let lock = manager.lock();

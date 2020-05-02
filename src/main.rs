@@ -16,7 +16,7 @@ fn main() -> JoyConResult<()> {
         }
     });
 
-    let manager = JoyConManager::new()?;
+    let manager = JoyConManager::get_instance();
     let (managed_devices, new_devices) = {
         let lock = manager.lock();
         match lock {

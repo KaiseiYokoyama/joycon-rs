@@ -71,7 +71,7 @@ pub enum Rotation {
 /// ```no_run
 /// use joycon_rs::prelude::{*, joycon_features::JoyConFeature};
 ///
-/// let manager = JoyConManager::new().unwrap();
+/// let manager = JoyConManager::get_instance();
 /// let (managed_devices, new_devices) = {
 ///     let lock = manager.lock();
 ///     match lock {
@@ -355,7 +355,7 @@ mod global_packet_number {
 /// use joycon_rs::prelude::{JoyConManager, SimpleJoyConDriver, lights::*};
 /// use joycon_rs::result::JoyConResult;
 ///
-/// let manager = JoyConManager::new().unwrap();
+/// let manager = JoyConManager::get_instance();
 ///
 /// let (managed_devices, new_devices) = {
 ///     let lock = manager.lock();
@@ -619,7 +619,6 @@ pub mod input_report_mode {
     pub use common::*;
     pub use self::{sub_command_mode::SubCommandMode, standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
     use std::convert::TryFrom;
-    use std::ops::{Deref, DerefMut};
     use std::hash::Hash;
 
     mod common {
@@ -854,43 +853,32 @@ pub mod input_report_mode {
         }
     }
 
-    pub trait InputReportMode<D: JoyConDriver>: Deref<Target=D> + DerefMut<Target=D> {
-        type Mode: InputReportMode<D>;
+    pub trait InputReportMode<D: JoyConDriver>: Sized {
         type Report: TryFrom<[u8; 362], Error=JoyConError>;
         type ArgsType: AsRef<[u8]>;
 
         const SUB_COMMAND: SubCommand;
         const ARGS: Self::ArgsType;
 
-        /// Mode's setup operation.
-        /// ex. Enable 6-Axis sensor
-        /// note: There are no needs to change Joy-Con's input report mode, leave it to `InputReportMode<D>::new()`.
-        fn setup(driver: D) -> JoyConResult<D>;
-
-        /// Construct instance simply. Typically, your implementation will be ->
-        /// ```ignore
-        /// fn construct(driver: D) -> Self::Mode {
-        ///     Self::Mode { driver }
-        /// }
-        /// ```
-        fn construct(driver: D) -> Self::Mode;
-
-        /// set Joy-Con's input report mode and return instance
-        fn new(driver: D) -> JoyConResult<Self::Mode> {
-            let mut driver = Self::Mode::setup(driver)?;
-
-            driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
-
-            Ok(Self::construct(driver))
-        }
+        /// Set Joy-Con's input report mode and return instance
+        fn new(driver: D) -> JoyConResult<Self>;
 
         /// read Joy-Con's input report
         fn read_input_report(&self) -> JoyConResult<Self::Report> {
             let mut buf = [0u8; 362];
-            self.read(&mut buf)?;
+            self.driver().read(&mut buf)?;
 
             Self::Report::try_from(buf)
         }
+
+        /// Refference of driver.
+        fn driver(&self) -> &D;
+
+        /// Mutable refference of driver.
+        fn driver_mut(&mut self) -> &mut D;
+
+        /// Unwrap.
+        fn into_driver(self) -> D;
     }
 
     /// Standard input report with extra report.
@@ -1113,6 +1101,7 @@ pub mod input_report_mode {
         }
 
         /// Receive standard input report with sub-command's reply.
+        #[deprecated]
         pub struct SubCommandMode<D, RD>
             where D: JoyConDriver, RD: SubCommandReplyData
         {
@@ -1120,52 +1109,42 @@ pub mod input_report_mode {
             _phantom: PhantomData<RD>,
         }
 
-        impl<D, RD> Deref for SubCommandMode<D, RD>
-            where D: JoyConDriver,
-                  RD: SubCommandReplyData
-        {
-            type Target = D;
-
-            fn deref(&self) -> &Self::Target {
-                &self.driver
-            }
-        }
-
-        impl<D, RD> DerefMut for SubCommandMode<D, RD>
-            where D: JoyConDriver,
-                  RD: SubCommandReplyData
-        {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.driver
-            }
-        }
-
         impl<D, RD> InputReportMode<D> for SubCommandMode<D, RD>
             where D: JoyConDriver,
                   RD: SubCommandReplyData
         {
-            type Mode = SubCommandMode<D, RD>;
             type Report = StandardInputReport<SubCommandReport<RD>>;
             type ArgsType = RD::ArgsType;
             const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
             const ARGS: Self::ArgsType = RD::ARGS;
 
-            fn setup(driver: D) -> JoyConResult<D> {
-                Ok(driver)
-            }
+            fn new(driver: D) -> JoyConResult<Self> {
+                let mut driver = driver;
+                driver.send_sub_command(Self::SUB_COMMAND,Self::ARGS.as_ref())?;
 
-            fn construct(driver: D) -> Self::Mode {
-                SubCommandMode {
+                Ok(SubCommandMode {
                     driver,
                     _phantom: PhantomData,
-                }
+                })
+            }
+
+            fn driver(&self) -> &D {
+                &self.driver
+            }
+
+            fn driver_mut(&mut self) -> &mut D {
+                &mut self.driver
+            }
+
+            fn into_driver(self) -> D {
+                self.driver
             }
         }
     }
 
     /// Receive standard full report (standard input report with IMU(6-Axis sensor) data).
     ///
-    /// Pushes current state at 60Hz.
+    /// Pushes current state at 60Hz (ProCon: 120Hz).
     pub mod standard_full_mode {
         use super::*;
 
@@ -1258,7 +1237,7 @@ pub mod input_report_mode {
         ///     }
         /// });
         ///
-        /// let manager = JoyConManager::new().unwrap();
+        /// let manager = JoyConManager::get_instance();
         ///
         /// let (managed_devices, new_devices) = {
         ///     let lock = manager.lock();
@@ -1292,34 +1271,15 @@ pub mod input_report_mode {
             driver: D,
         }
 
-        impl<D> Deref for StandardFullMode<D>
-            where D: JoyConDriver
-        {
-            type Target = D;
-
-            fn deref(&self) -> &Self::Target {
-                &self.driver
-            }
-        }
-
-        impl<D> DerefMut for StandardFullMode<D>
-            where D: JoyConDriver
-        {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.driver
-            }
-        }
-
         impl<D> InputReportMode<D> for StandardFullMode<D>
             where D: JoyConDriver
         {
-            type Mode = StandardFullMode<D>;
             type Report = StandardInputReport<IMUData>;
             type ArgsType = [u8; 1];
             const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
             const ARGS: Self::ArgsType = [0x30];
 
-            fn setup(driver: D) -> JoyConResult<D> {
+            fn new(driver: D) -> JoyConResult<Self> {
                 let mut driver = driver;
                 // enable IMU(6-Axis sensor)
                 let imf_enabled = driver.enabled_features()
@@ -1332,13 +1292,23 @@ pub mod input_report_mode {
                     driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
                 }
 
-                Ok(driver)
+                driver.send_sub_command(Self::SUB_COMMAND,Self::ARGS.as_ref())?;
+
+                Ok(StandardFullMode {
+                    driver
+                })
             }
 
-            fn construct(driver: D) -> Self::Mode {
-                Self::Mode {
-                    driver
-                }
+            fn driver(&self) -> &D {
+                &self.driver
+            }
+
+            fn driver_mut(&mut self) -> &mut D {
+                &mut self.driver
+            }
+
+            fn into_driver(self) -> D {
+                self.driver
             }
         }
     }
@@ -1497,7 +1467,7 @@ pub mod input_report_mode {
         ///     dbg!(simple_hid_report);
         /// }
         ///
-        /// let manager = JoyConManager::new().unwrap();
+        /// let manager = JoyConManager::get_instance();
         ///
         /// let (managed_devices, new_devices) = {
         ///     let lock = manager.lock();
@@ -1531,38 +1501,33 @@ pub mod input_report_mode {
             driver: D,
         }
 
-        impl<D: JoyConDriver> Deref for SimpleHIDMode<D> {
-            type Target = D;
-
-            fn deref(&self) -> &Self::Target {
-                &self.driver
-            }
-        }
-
-        impl<D: JoyConDriver> DerefMut for SimpleHIDMode<D> {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.driver
-            }
-        }
-
         impl<D> InputReportMode<D> for SimpleHIDMode<D>
             where D: JoyConDriver
         {
-            type Mode = SimpleHIDMode<D>;
             type Report = SimpleHIDReport;
             type ArgsType = [u8; 1];
             const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
             const ARGS: Self::ArgsType = [0x3F];
 
-            fn setup(driver: D) -> JoyConResult<D> {
-                // do nothing
-                Ok(driver)
+            fn new(driver: D) -> JoyConResult<Self> {
+                let mut driver = driver;
+                driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
+
+                Ok(SimpleHIDMode {
+                    driver
+                })
             }
 
-            fn construct(driver: D) -> Self::Mode {
-                Self::Mode {
-                    driver
-                }
+            fn driver(&self) -> &D {
+                &self.driver
+            }
+
+            fn driver_mut(&mut self) -> &mut D {
+                &mut self.driver
+            }
+
+            fn into_driver(self) -> D {
+                self.driver
             }
         }
     }
@@ -1576,7 +1541,7 @@ pub mod input_report_mode {
 /// ```no_run
 /// use joycon_rs::prelude::{*, lights::*};
 ///
-/// let manager = JoyConManager::new().unwrap();
+/// let manager = JoyConManager::get_instance();
 ///
 /// let device = manager.lock()
 ///                     .unwrap()
@@ -1754,7 +1719,19 @@ pub mod lights {
                 self.phases.push(phase);
             }
 
+            pub fn phases(&self) -> &Vec<LightEmittingPhase> {
+                &self.phases
+            }
+
             /// Add emitting phase to pattern.
+            ///
+            /// `fading_transition_duration` and `led_duration` is represented by 4-bit unsigned int
+            /// in field and is treated as a multiplier of the `LightEmittingPattern.global_mini_cycle_duration`
+            /// specified by the first argument of LightEmittingPattern::new().
+            ///
+            /// Therefore, depending on the combination of the `LightEmittingPattern.global_mini_cycle_duration`
+            /// and the specified value, different values may be regarded as the same value
+            /// when converted to 4-bit unsigned int, and no difference may appear in the luminous pattern.
             ///
             /// * led_intensity (*%*) - 0 <= led_intensity <= 100
             /// * fading_transition_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration (ms) * 15
@@ -1769,7 +1746,7 @@ pub mod lights {
                     (fading_transition_duration / gmcd as u16) as u8
                 }.into();
                 let led_duration = {
-                    let gmcd: u8 =  self.global_mini_cycle_duration.into();
+                    let gmcd: u8 = self.global_mini_cycle_duration.into();
                     (led_duration / gmcd as u16) as u8
                 }.into();
 
@@ -1785,12 +1762,15 @@ pub mod lights {
             }
 
             /// Does the 1st phase and then the LED stays on with LED Start Intensity.
-            pub fn emit_first_phase(&self) -> Self {
-                let mut pattern = self.clone();
+            ///
+            /// For more information about the arguments,
+            /// see the [new](#method.new) and [add_phase](#method.add_phase).
+            pub fn once(global_mini_cycle_duration: u8, led_start_intensity: u8,
+                        led_intensity: u8, fading_transition_duration: u16, led_duration: u16) -> Self {
+                let mut pattern = LightEmittingPattern::new(global_mini_cycle_duration,led_start_intensity, 0u8.into());
                 pattern.phases_len = Some(0u8.into());
-                pattern.repeat_count = 0u8.into();
 
-                pattern
+                pattern.add_phase(led_intensity, fading_transition_duration, led_duration)
             }
         }
 
@@ -1798,7 +1778,7 @@ pub mod lights {
             fn into(self) -> [u8; 25] {
                 fn nibbles_to_u8(high: u4, low: u4) -> u8 {
                     let high = {
-                        let high :u8 = high.into();
+                        let high: u8 = high.into();
                         (high & 0x0F) << 4
                     };
                     let low = {
@@ -1881,7 +1861,7 @@ pub mod lights {
         /// use joycon_rs::prelude::{*, lights::*};
         ///
         /// // some code omitted
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1900,7 +1880,7 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1921,7 +1901,7 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1954,7 +1934,7 @@ pub mod lights {
         /// ```no_run
         /// use joycon_rs::prelude::{*, lights::*};
         ///
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1980,7 +1960,7 @@ pub mod lights {
         /// ```no_run
         /// use joycon_rs::prelude::{*, lights::{*, home_button::*}};
         ///
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1998,7 +1978,7 @@ pub mod lights {
         /// let player_lights_status = joycon_driver.set_home_light(&pattern);
         /// ```
         fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<[u8; 362]> {
-            let arg: [u8;25] = pattern.clone().into();
+            let arg: [u8; 25] = pattern.clone().into();
             self.send_sub_command(SubCommand::SetHOMELight, &arg)
         }
     }
