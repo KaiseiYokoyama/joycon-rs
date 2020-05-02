@@ -1,7 +1,7 @@
 use super::*;
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Mutex, Once};
 use std::time::Duration;
 use std::thread::JoinHandle;
 use std::option::Option::Some;
@@ -25,12 +25,32 @@ pub struct JoyConManager {
 }
 
 impl JoyConManager {
+    /// Get `JoyConManager` instance.
+    pub fn get_instance() -> Arc<Mutex<Self>> {
+        static mut SINGLETON: Option<Arc<Mutex<JoyConManager>>> = None;
+        static ONCE: Once = Once::new();
+
+        unsafe {
+            ONCE.call_once(|| {
+                let instance = JoyConManager::new()
+                    .unwrap();
+
+                SINGLETON = Some(instance);
+            });
+
+            match SINGLETON.clone() {
+                Some(manager) => manager,
+                None => unreachable!()
+            }
+        }
+    }
+
     /// Constructor
-    pub fn new() -> JoyConResult<Arc<Mutex<Self>>> {
+    fn new() -> JoyConResult<Arc<Mutex<Self>>> {
         Self::with_interval(std::time::Duration::from_millis(100))
     }
 
-    pub fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
+    fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
         let (tx, rx) = crossbeam_channel::bounded(0);
 
         let manager = {
@@ -85,6 +105,11 @@ impl JoyConManager {
         }
 
         Ok(manager)
+    }
+
+    /// Set scan interval
+    pub fn set_interval(&mut self, interval: Duration) {
+        self.scan_interval = interval;
     }
 
     /// Scan the JoyCon connected to your computer.
