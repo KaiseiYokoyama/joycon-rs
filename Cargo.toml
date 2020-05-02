@@ -33,3 +33,6 @@ name = "simple_hid_report"
 
 [[example]]
 name = "rumble"
+
+[[spi]]
+name = "spi"

@@ -626,7 +626,7 @@ impl SimpleJoyConDriver {
             global_packet_number: GlobalPacketNumber::default(),
         };
 
-        driver.reset()?;
+        // driver.reset()?;
 
         Ok(driver)
     }
@@ -649,6 +649,12 @@ pub trait JoyConDriver {
 
     /// Read reply from Joy-Con
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize>;
+
+    /// Send feature report to Joy-Con
+    fn send_feature_report(&self, data: &[u8]) -> JoyConResult<()>;
+
+    /// Read feature report from Joy-Con
+    fn get_feature_report(&self, buf: &mut [u8]) -> JoyConResult<usize>;
 
     /// Get global packet number
     fn global_packet_number(&self) -> u8;
@@ -766,6 +772,14 @@ impl JoyConDriver for SimpleJoyConDriver {
 
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
         Ok(self.joycon().read(buf)?)
+    }
+
+    fn send_feature_report(&self, data: &[u8]) -> JoyConResult<()> {
+        Ok(self.joycon().send_feature_report(data)?)
+    }
+
+    fn get_feature_report(&self, buf: &mut [u8]) -> JoyConResult<usize> {
+        Ok(self.joycon().get_feature_report(buf)?)
     }
 
     fn global_packet_number(&self) -> u8 {
@@ -2255,13 +2269,20 @@ pub mod device_info {
 }
 
 pub mod spi {
-    use super::{*, input_report_mode::sub_command_mode::*};
+    use super::{*,
+                input_report_mode::{
+                    sub_command_mode::*,
+                    StandardInputReport,
+                },
+    };
+
+    // todo replace with `.to_le_bytes()` after it is stabilised.
 
     /// Convert i32 address and i8 length to u8 array
     ///
     /// # Notice
     /// ***`Length <= 0x1D`***
-    pub const fn spi_target(address: u32, length: u8) -> [u8;5] {
+    pub const fn spi_target(address: u32, length: u8) -> [u8; 5] {
         // let address_le_bytes: [u8;4] = address.to_le_bytes();
         // let length: [u8;1] = if length > 0x1D {
         //     0x1D
@@ -2287,11 +2308,11 @@ pub mod spi {
 
     #[test]
     fn test() {
-        let target = spi_target(0x6080,0x18);
-        assert_eq!(target, [0x80,0x60,0x00,0x00,0x18]);
+        let target = spi_target(0x6080, 0x18);
+        assert_eq!(target, [0x80, 0x60, 0x00, 0x00, 0x18]);
     }
 
-    pub trait SPIData: TryFrom<[u8;35], Error = JoyConError> {
+    pub trait SPIData: TryFrom<[u8; 35], Error=JoyConError> {
         const ADDRESS: u32;
         const LENGTH: u8;
     }
@@ -2300,6 +2321,56 @@ pub mod spi {
         type ArgsType = [u8; 5];
         const SUB_COMMAND: SubCommand = SubCommand::SPIFlashRead;
         const ARGS: Self::ArgsType = spi_target(Self::ADDRESS, Self::LENGTH);
+
+        fn once<D>(driver: &mut D) -> JoyConResult<StandardInputReport<SubCommandReport<Self>>>
+            where Self: std::marker::Sized,
+                  D: JoyConDriver
+        {
+            // let args = spi_target(Self::ADDRESS + 0xF8000000, Self::LENGTH);
+            // let mut report = [
+            //     // FEATURE 0x71: Setup memory read
+            //     0x71,
+            //     // UInt32LE address
+            //     args[0],
+            //     args[1],
+            //     args[2],
+            //     args[3],
+            //     // UInt16LE size. Max xF9 bytes.
+            //     args[4],
+            //     0x00,
+            //     // Checksum (8-bit 2s Complement): calculated as 0x100 - `Sum of Bytes`.
+            //     {
+            //         let acc = ((0x71
+            //             + args[0] as u32
+            //             + args[1] as u32
+            //             + args[2] as u32
+            //             + args[3] as u32
+            //             + args[4] as u32) & 0xFF) as u8;
+            //         let cmp = std::u8::MAX - acc + 1;
+            //
+            //         cmp
+            //     }
+            // ];
+            // println!("[0x{:X},0x{:X},0x{:X},0x{:X},0x{:X},0x{:X},0x{:X},0x{:X}]",
+            //          report[0],
+            //          report[1],
+            //          report[2],
+            //          report[3],
+            //          report[4],
+            //          report[5],
+            //          report[6],
+            //          report[7], );
+            //
+            // driver.send_feature_report(&report)?;
+            // std::thread::sleep(std::time::Duration::from_millis(50));
+            // let mut buf = [0u8;50];
+            // driver.get_feature_report(&mut buf[..])?;
+            // dbg!(buf.to_vec());
+            dbg!(line!());
+            let reply = driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
+            dbg!(line!());
+            StandardInputReport::try_from(reply)
+        }
     }
 }
 

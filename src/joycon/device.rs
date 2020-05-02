@@ -70,6 +70,7 @@ impl JoyConDevice {
         )
     }
 
+    /// Alias of [`HidDevice::write()`](https://docs.rs/hidapi/*/hidapi/struct.HidDevice.html#method.write)
     pub fn write(&self, data: &[u8]) -> JoyConResult<usize> {
         if let Some(hid_device) = &self.hid_device {
             Ok(hid_device.write(data)?)
@@ -78,9 +79,28 @@ impl JoyConDevice {
         }
     }
 
+    /// Alias of [`HidDevice::read()`](https://docs.rs/hidapi/*/hidapi/struct.HidDevice.html#method.read)
     pub fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
         if let Some(hid_device) = &self.hid_device {
             Ok(hid_device.read(buf)?)
+        } else {
+            Err(JoyConError::Disconnected)
+        }
+    }
+
+    /// Alias of [`HidDevice::send_feature_report()`](https://docs.rs/hidapi/*/hidapi/struct.HidDevice.html#method.send_feature_report)
+    pub fn send_feature_report(&self, data: &[u8]) -> JoyConResult<()> {
+        if let Some(hid_device) = &self.hid_device {
+            Ok(hid_device.send_feature_report(data)?)
+        } else {
+            Err(JoyConError::Disconnected)
+        }
+    }
+
+    /// Alias of [`HidDevice::get_feature_report()`](https://docs.rs/hidapi/*/hidapi/struct.HidDevice.html#method.get_feature_report)
+    pub fn get_feature_report(&self, buf: &mut [u8]) -> JoyConResult<usize> {
+        if let Some(hid_device) = &self.hid_device {
+            Ok(hid_device.get_feature_report(buf)?)
         } else {
             Err(JoyConError::Disconnected)
         }
