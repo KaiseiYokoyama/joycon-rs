@@ -9,7 +9,7 @@ fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
 
     let manager =
-        JoyConManager::new()?;
+        JoyConManager::get_instance();
     let (managed_devices, new_devices) = {
         let lock = manager.lock();
         match lock {
