@@ -53,7 +53,7 @@ let _output = std::thread::spawn(move || {
     }
 });
 
-let manager = JoyConManager::new().unwrap();
+let manager = JoyConManager::get_instance();
 let (managed_devices, new_devices) = {
 let lock = manager.lock();
     match lock {
@@ -99,7 +99,7 @@ let _output = std::thread::spawn(move || {
     }
 });
 
-let manager = JoyConManager::new().unwrap();
+let manager = JoyConManager::get_instance();
 let (managed_devices, new_devices) = {
 let lock = manager.lock();
     match lock {
@@ -131,7 +131,7 @@ use joycon_rs::joycon::joycon_features::JoyConFeature;
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
 
-    let manager = JoyConManager::new()?;
+    let manager = JoyConManager::get_instance();
     let (managed_devices, new_devices) = {
         let lock = manager.lock();
         match lock {

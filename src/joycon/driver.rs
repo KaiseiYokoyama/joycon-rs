@@ -71,7 +71,7 @@ pub enum Rotation {
 /// ```no_run
 /// use joycon_rs::prelude::{*, joycon_features::JoyConFeature};
 ///
-/// let manager = JoyConManager::new().unwrap();
+/// let manager = JoyConManager::get_instance();
 /// let (managed_devices, new_devices) = {
 ///     let lock = manager.lock();
 ///     match lock {
@@ -355,7 +355,7 @@ mod global_packet_number {
 /// use joycon_rs::prelude::{JoyConManager, SimpleJoyConDriver, lights::*};
 /// use joycon_rs::result::JoyConResult;
 ///
-/// let manager = JoyConManager::new().unwrap();
+/// let manager = JoyConManager::get_instance();
 ///
 /// let (managed_devices, new_devices) = {
 ///     let lock = manager.lock();
@@ -1236,7 +1236,7 @@ pub mod input_report_mode {
         ///     }
         /// });
         ///
-        /// let manager = JoyConManager::new().unwrap();
+        /// let manager = JoyConManager::get_instance();
         ///
         /// let (managed_devices, new_devices) = {
         ///     let lock = manager.lock();
@@ -1466,7 +1466,7 @@ pub mod input_report_mode {
         ///     dbg!(simple_hid_report);
         /// }
         ///
-        /// let manager = JoyConManager::new().unwrap();
+        /// let manager = JoyConManager::get_instance();
         ///
         /// let (managed_devices, new_devices) = {
         ///     let lock = manager.lock();
@@ -1540,7 +1540,7 @@ pub mod input_report_mode {
 /// ```no_run
 /// use joycon_rs::prelude::{*, lights::*};
 ///
-/// let manager = JoyConManager::new().unwrap();
+/// let manager = JoyConManager::get_instance();
 ///
 /// let device = manager.lock()
 ///                     .unwrap()
@@ -1845,7 +1845,7 @@ pub mod lights {
         /// use joycon_rs::prelude::{*, lights::*};
         ///
         /// // some code omitted
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1864,7 +1864,7 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1885,7 +1885,7 @@ pub mod lights {
         /// ```no_run
         /// # use joycon_rs::prelude::{*, lights::*};
         /// #
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1918,7 +1918,7 @@ pub mod lights {
         /// ```no_run
         /// use joycon_rs::prelude::{*, lights::*};
         ///
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()
@@ -1944,7 +1944,7 @@ pub mod lights {
         /// ```no_run
         /// use joycon_rs::prelude::{*, lights::{*, home_button::*}};
         ///
-        /// # let manager = JoyConManager::new().unwrap();
+        /// # let manager = JoyConManager::get_instance();
         /// #
         /// # let device = manager.lock()
         /// #                     .unwrap()

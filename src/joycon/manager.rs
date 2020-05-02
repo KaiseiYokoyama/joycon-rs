@@ -156,8 +156,8 @@ impl JoyConManager {
                 let device = JoyConDevice::new(di, hid_api).ok()?;
                 Some((serial_number, device))
             })
-            .map(|(serial, device)| (serial,Arc::new(Mutex::new(device))))
-            .collect::<HashMap<_,_>>();
+            .map(|(serial, device)| (serial, Arc::new(Mutex::new(device))))
+            .collect::<HashMap<_, _>>();
 
         // removed
         {
@@ -254,7 +254,7 @@ impl JoyConManager {
     ///     }
     /// });
     ///
-    /// let manager = JoyConManager::new().unwrap();
+    /// let manager = JoyConManager::get_instance();
     ///
     /// let (managed_devices, new_devices) = {
     ///     let lock = manager.lock();

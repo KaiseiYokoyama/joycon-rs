@@ -40,7 +40,7 @@
 //!     }
 //! });
 //!
-//! let manager = JoyConManager::new().unwrap();
+//! let manager = JoyConManager::get_instance();
 //!
 //! let (managed_devices, new_devices) = {
 //!     let lock = manager.lock();
@@ -96,7 +96,7 @@
 //!     }
 //! });
 //!
-//! let manager = JoyConManager::new().unwrap();
+//! let manager = JoyConManager::get_instance();
 //!
 //! let (managed_devices, new_devices) = {
 //!     let lock = manager.lock();
