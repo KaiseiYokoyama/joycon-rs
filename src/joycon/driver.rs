@@ -1719,7 +1719,19 @@ pub mod lights {
                 self.phases.push(phase);
             }
 
+            pub fn phases(&self) -> &Vec<LightEmittingPhase> {
+                &self.phases
+            }
+
             /// Add emitting phase to pattern.
+            ///
+            /// `fading_transition_duration` and `led_duration` is represented by 4-bit unsigned int
+            /// in field and is treated as a multiplier of the `LightEmittingPattern.global_mini_cycle_duration`
+            /// specified by the first argument of LightEmittingPattern::new().
+            ///
+            /// Therefore, depending on the combination of the `LightEmittingPattern.global_mini_cycle_duration`
+            /// and the specified value, different values may be regarded as the same value
+            /// when converted to 4-bit unsigned int, and no difference may appear in the luminous pattern.
             ///
             /// * led_intensity (*%*) - 0 <= led_intensity <= 100
             /// * fading_transition_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration (ms) * 15
@@ -1750,12 +1762,15 @@ pub mod lights {
             }
 
             /// Does the 1st phase and then the LED stays on with LED Start Intensity.
-            pub fn emit_first_phase(&self) -> Self {
-                let mut pattern = self.clone();
+            ///
+            /// For more information about the arguments,
+            /// see the [new](#method.new) and [add_phase](#method.add_phase).
+            pub fn once(global_mini_cycle_duration: u8, led_start_intensity: u8,
+                        led_intensity: u8, fading_transition_duration: u16, led_duration: u16) -> Self {
+                let mut pattern = LightEmittingPattern::new(global_mini_cycle_duration,led_start_intensity, 0u8.into());
                 pattern.phases_len = Some(0u8.into());
-                pattern.repeat_count = 0u8.into();
 
-                pattern
+                pattern.add_phase(led_intensity, fading_transition_duration, led_duration)
             }
         }
 
