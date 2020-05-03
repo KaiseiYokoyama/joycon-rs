@@ -72,17 +72,15 @@ pub enum Rotation {
 /// use joycon_rs::prelude::{*, joycon_features::JoyConFeature};
 ///
 /// let manager = JoyConManager::get_instance();
-/// let (managed_devices, new_devices) = {
+/// let devices = {
 ///     let lock = manager.lock();
 ///     match lock {
-///         Ok(manager) =>
-///             (manager.managed_devices(), manager.new_devices()),
+///         Ok(manager) => manager.new_devices(),
 ///         Err(_) => unreachable!(),
 ///     }
 /// };
 ///
-/// managed_devices.into_iter()
-///     .chain(new_devices)
+/// devices.iter()
 ///     .try_for_each::<_, JoyConResult<()>>(|d| {
 ///         let mut driver = SimpleJoyConDriver::new(&d)?;
 ///
@@ -357,16 +355,15 @@ mod global_packet_number {
 ///
 /// let manager = JoyConManager::get_instance();
 ///
-/// let (managed_devices, new_devices) = {
+/// let devices = {
 ///     let lock = manager.lock();
 ///     match lock {
-///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+///         Ok(manager) => manager.new_devices(),
 ///         Err(_) => return,
 ///     }
 /// };
 ///
-/// managed_devices.into_iter()
-///     .chain(new_devices)
+/// devices.iter()
 ///     .try_for_each::<_,JoyConResult<()>>(|device| {
 ///         let mut driver = SimpleJoyConDriver::new(&device)?;
 ///
@@ -1239,16 +1236,15 @@ pub mod input_report_mode {
         ///
         /// let manager = JoyConManager::get_instance();
         ///
-        /// let (managed_devices, new_devices) = {
+        /// let devices = {
         ///     let lock = manager.lock();
         ///     match lock {
-        ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+        ///         Ok(manager) => manager.new_devices(),
         ///         Err(_) => return,
         ///     }
         /// };
         ///
-        /// managed_devices.into_iter()
-        ///     .chain(new_devices)
+        /// devices.iter()
         ///     .flat_map(|device| SimpleJoyConDriver::new(&device))
         ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
         ///         let sender = sender.clone();
@@ -1469,16 +1465,15 @@ pub mod input_report_mode {
         ///
         /// let manager = JoyConManager::get_instance();
         ///
-        /// let (managed_devices, new_devices) = {
+        /// let devices = {
         ///     let lock = manager.lock();
         ///     match lock {
-        ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+        ///         Ok(manager) => manager.new_devices(),
         ///         Err(_) => return,
         ///     }
         /// };
         ///
-        /// managed_devices.into_iter()
-        ///     .chain(new_devices)
+        /// devices.iter()
         ///     .flat_map(|d| SimpleJoyConDriver::new(&d))
         ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
         ///         let sender = sender.clone();
