@@ -54,7 +54,9 @@ impl JoyConManager {
     }
 
     fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
-        let (tx, rx) = crossbeam_channel::bounded(0);
+        let (tx, rx) =
+            crossbeam_channel::unbounded();
+            // crossbeam_channel::bounded(0);
 
         let manager = {
             let mut manager = JoyConManager {
@@ -66,7 +68,11 @@ impl JoyConManager {
             };
 
             // First scan
-            manager.scan()?;
+            manager.scan()?
+                .into_iter()
+                .for_each(|new_device| {
+                    let _ = tx.send(new_device);
+                });
 
             Arc::new(Mutex::new(manager))
         };
@@ -84,7 +90,7 @@ impl JoyConManager {
 
                     // Send new devices
                     if let Ok(new_devices) = manager.scan() {
-                        // If mspc channel is disconnected, end this thread.
+                        // If mpsc channel is disconnected, end this thread.
                         let send_result = new_devices.into_iter()
                             .try_for_each::<_, Result<(), crossbeam_channel::SendError<_>>>(|new_device| {
                                 tx.send(new_device)
