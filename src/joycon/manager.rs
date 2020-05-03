@@ -54,7 +54,9 @@ impl JoyConManager {
     }
 
     fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
-        let (tx, rx) = crossbeam_channel::bounded(0);
+        let (tx, rx) =
+            crossbeam_channel::unbounded();
+            // crossbeam_channel::bounded(0);
 
         let manager = {
             let mut manager = JoyConManager {
@@ -66,7 +68,11 @@ impl JoyConManager {
             };
 
             // First scan
-            manager.scan()?;
+            manager.scan()?
+                .into_iter()
+                .for_each(|new_device| {
+                    let _ = tx.send(new_device);
+                });
 
             Arc::new(Mutex::new(manager))
         };
@@ -84,7 +90,7 @@ impl JoyConManager {
 
                     // Send new devices
                     if let Ok(new_devices) = manager.scan() {
-                        // If mspc channel is disconnected, end this thread.
+                        // If mpsc channel is disconnected, end this thread.
                         let send_result = new_devices.into_iter()
                             .try_for_each::<_, Result<(), crossbeam_channel::SendError<_>>>(|new_device| {
                                 tx.send(new_device)
@@ -259,16 +265,15 @@ impl JoyConManager {
     ///
     /// let manager = JoyConManager::get_instance();
     ///
-    /// let (managed_devices, new_devices) = {
+    /// let devices = {
     ///     let lock = manager.lock();
     ///     match lock {
-    ///         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+    ///         Ok(manager) => manager.new_devices(),
     ///         Err(_) => return,
     ///     }
     /// };
     ///
-    /// managed_devices.into_iter()
-    ///     .chain(new_devices)
+    /// devices.iter()
     ///     .flat_map(|device| SimpleJoyConDriver::new(&device))
     ///     .try_for_each::<_, JoyConResult<()>>(|driver| {
     ///         let simple_hid_mode = SimpleHIDMode::new(driver)?;

@@ -42,16 +42,15 @@
 //!
 //! let manager = JoyConManager::get_instance();
 //!
-//! let (managed_devices, new_devices) = {
+//! let devices = {
 //!     let lock = manager.lock();
 //!     match lock {
-//!         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+//!         Ok(manager) => manager.new_devices(),
 //!         Err(_) => return,
 //!     }
 //! };
 //!
-//! managed_devices.into_iter()
-//!     .chain(new_devices)
+//! devices.iter()
 //!     .flat_map(|dev| SimpleJoyConDriver::new(&dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|driver| {
 //!         // Change JoyCon to Simple hid mode.
@@ -98,16 +97,15 @@
 //!
 //! let manager = JoyConManager::get_instance();
 //!
-//! let (managed_devices, new_devices) = {
+//! let devices = {
 //!     let lock = manager.lock();
 //!     match lock {
-//!         Ok(manager) => (manager.managed_devices(), manager.new_devices()),
+//!         Ok(manager) => manager.new_devices(),
 //!         Err(_) => return,
 //!     }
 //! };
 //!
-//! managed_devices.into_iter()
-//!     .chain(new_devices)
+//! devices.iter()
 //!     .flat_map(|dev| SimpleJoyConDriver::new(&dev))
 //!     .try_for_each::<_, JoyConResult<()>>(|mut driver| {
 //!         // Set player lights

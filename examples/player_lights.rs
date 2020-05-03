@@ -9,23 +9,22 @@ fn main() -> JoyConResult<()> {
 
     let manager =
         JoyConManager::get_instance();
-    let (managed_devices, new_devices) = {
+    let devices = {
         let lock = manager.lock();
         match lock {
-            Ok(manager) =>
-                (manager.managed_devices(), manager.new_devices()),
+            Ok(manager) => manager.new_devices(),
             Err(_) => unreachable!(),
         }
     };
 
-    managed_devices.into_iter()
-        .chain(new_devices)
+    devices.iter()
         .inspect(|d| {
             let lock = d.lock();
             let device = match lock {
                 Ok(device) => device,
                 Err(e) => e.into_inner(),
             };
+            dbg!(&device);
             let hid_device: JoyConResult<&HidDevice> = device.deref().try_into();
             if let Ok(hid_device) = hid_device {
                 println!("{:?}", hid_device.get_product_string())
