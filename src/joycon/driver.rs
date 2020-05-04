@@ -2307,7 +2307,7 @@ pub mod spi {
     }
 
     #[test]
-    fn test() {
+    fn test_spi_target() {
         let target = spi_target(0x6080, 0x18);
         assert_eq!(target, [0x80, 0x60, 0x00, 0x00, 0x18]);
     }
@@ -2315,6 +2315,43 @@ pub mod spi {
     pub trait SPIData: TryFrom<[u8; 35], Error=JoyConError> {
         const ADDRESS: u32;
         const LENGTH: u8;
+    }
+
+    fn setup_memory_read_target(address: u32, length: u8) -> [u8; 8] {
+        let args = spi_target(address + 0xF8000000, length);
+        [
+            // FEATURE 0x71: Setup memory read
+            0x71,
+            // UInt32LE address
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            // UInt16LE size. Max xF9 bytes.
+            args[4],
+            0x00,
+            // Checksum (8-bit 2s Complement): calculated as 0x100 - `Sum of Bytes`.
+            {
+                let acc = ((0x71
+                    + args[0] as u32
+                    + args[1] as u32
+                    + args[2] as u32
+                    + args[3] as u32
+                    + args[4] as u32) & 0xFF) as u8;
+                let cmp = std::u8::MAX - acc + 1;
+
+                cmp
+            }
+        ]
+    }
+
+    #[test]
+    fn test_setup_memory_read_target() {
+        let target = setup_memory_read_target(0x1FF4, 0x08);
+        assert_eq!(target, [0x71, 0xF4, 0x1F, 0x00, 0xF8, 0x08, 0x00, 0x7C]);
+
+        let target = setup_memory_read_target(0x603D,18);
+        assert_eq!(target, [0x71,0x3D,0x60,0x0,0xF8,0x12,0x0,0xE8]);
     }
 
     impl<T: SPIData> SubCommandReplyData for T {
