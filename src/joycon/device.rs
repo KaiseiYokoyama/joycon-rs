@@ -41,6 +41,14 @@ impl JoyConDevice {
         &self.serial_number
     }
 
+    pub fn set_blocking_mode(&self, blocking: bool) -> JoyConResult<()> {
+        if let Some(hid_device) = &self.hid_device {
+            Ok(hid_device.set_blocking_mode(blocking)?)
+        } else {
+            Err(JoyConError::Disconnected)
+        }
+    }
+
     pub fn device_type(&self) -> JoyConDeviceType {
         self.device_type.clone()
     }
@@ -81,6 +89,15 @@ impl JoyConDevice {
     pub fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
         if let Some(hid_device) = &self.hid_device {
             Ok(hid_device.read(buf)?)
+        } else {
+            Err(JoyConError::Disconnected)
+        }
+    }
+
+    /// * timeout - milli seconds
+    pub fn read_timeout(&self, buf: &mut [u8], timeout: i32) -> JoyConResult<usize> {
+        if let Some(hid_device) = &self.hid_device {
+            Ok(hid_device.read_timeout(buf, timeout)?)
         } else {
             Err(JoyConError::Disconnected)
         }
