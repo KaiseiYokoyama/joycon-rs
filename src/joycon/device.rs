@@ -88,7 +88,13 @@ impl JoyConDevice {
 
     pub fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
         if let Some(hid_device) = &self.hid_device {
-            Ok(hid_device.read(buf)?)
+            let res = hid_device.read(buf)?;
+
+            if buf.iter().all(|e| e == &0) {
+                Err(JoyConReportError::EmptyReport.into())
+            } else {
+                Ok(res)
+            }
         } else {
             Err(JoyConError::Disconnected)
         }
@@ -97,7 +103,13 @@ impl JoyConDevice {
     /// * timeout - milli seconds
     pub fn read_timeout(&self, buf: &mut [u8], timeout: i32) -> JoyConResult<usize> {
         if let Some(hid_device) = &self.hid_device {
-            Ok(hid_device.read_timeout(buf, timeout)?)
+            let res = hid_device.read_timeout(buf, timeout)?;
+
+            if buf.iter().all(|e| e == &0) {
+                Err(JoyConReportError::EmptyReport.into())
+            } else {
+                Ok(res)
+            }
         } else {
             Err(JoyConError::Disconnected)
         }
