@@ -475,6 +475,10 @@ pub trait JoyConDriver {
 
     /// Send sub-command, and data (sub-command's arguments) with u8 integers
     /// This returns ACK packet for the command or Error.
+    ///
+    /// # Notice
+    /// If you are using non-blocking mode,
+    /// it is more likely to fail to validate the sub command reply.
     fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
         use input_report_mode::sub_command_mode::AckByte;
 
@@ -499,6 +503,10 @@ pub trait JoyConDriver {
 
     /// Send command, sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
+    ///
+    /// # Notice
+    /// If you are using non-blocking mode,
+    /// it is more likely to fail to validate the sub command reply.
     fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
         let command = command as u8;
         let sub_command = sub_command as u8;

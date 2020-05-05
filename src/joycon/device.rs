@@ -41,6 +41,11 @@ impl JoyConDevice {
         &self.serial_number
     }
 
+    /// Set blocking mode.
+    ///
+    /// # Notice
+    /// If you are using non-blocking mode,
+    /// it is more likely to fail to validate the sub command reply.
     pub fn set_blocking_mode(&self, blocking: bool) -> JoyConResult<()> {
         if let Some(hid_device) = &self.hid_device {
             Ok(hid_device.set_blocking_mode(blocking)?)
