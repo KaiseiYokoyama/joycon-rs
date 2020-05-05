@@ -198,6 +198,7 @@ pub mod result {
     pub enum JoyConReportError {
         InvalidSimpleHidReport(InvalidSimpleHIDReport),
         InvalidStandardInputReport(InvalidStandardInputReport),
+        EmptyReport,
     }
 
     impl From<JoyConReportError> for JoyConError {
