@@ -458,13 +458,11 @@ pub trait JoyConDriver {
 
         // rumble
         let (rumble_l, rumble_r) = self.get_rumble_status();
-        {
-            let rumble_l = rumble_l.unwrap_or(Rumble::new(40.0, 0.0));
+        if let Some(rumble_l) = rumble_l {
             let rumble_left: [u8; 4] = rumble_l.into();
             buf[2..6].copy_from_slice(&rumble_left);
         }
-        {
-            let rumble_r = rumble_r.unwrap_or(Rumble::new(40.0, 0.0));
+        if let Some(rumble_r) = rumble_r {
             let rumble_right: [u8; 4] = rumble_r.into();
             buf[6..10].copy_from_slice(&rumble_right);
         }
