@@ -434,7 +434,11 @@ pub trait JoyConDriver {
     fn set_rumble_status(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>));
 
     /// Set rumble status and send rumble command to JoyCon.
+    /// If Joy-Con's rumble feature isn't activated, activate it.
     fn rumble(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>)) -> JoyConResult<usize> {
+        if !self.enabled_features().contains(&JoyConFeature::Vibration) {
+            self.enable_feature(JoyConFeature::Vibration);
+        }
         self.set_rumble_status(rumble_l_r);
         self.send_command_raw(Command::Rumble as u8, 0, &[])
     }
