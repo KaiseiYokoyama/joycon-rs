@@ -161,19 +161,18 @@ impl Into<[u8; 4]> for Rumble {
         let encoded_hex_freq = f32::round(f32::log2(self.frequency / 10.0) * 32.0) as u8;
 
         let hf_freq: u16 = (encoded_hex_freq as u16).saturating_sub(0x60) * 4;
-        let lf_freq: u8 = encoded_hex_freq.saturating_sub(0x40);
+        let lf_freq: u8 = encoded_hex_freq.saturating_sub(0x41) + 1;
 
         let encoded_hex_amp = if self.amplitude > 0.23 {
             f32::round(f32::log2(self.amplitude * 8.7) * 32.0) as u8
         } else if self.amplitude > 0.12 {
             f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
         } else {
-            // todo study
-            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+            f32::round(((f32::log2(self.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * self.amplitude)) as u8
         };
 
         let hf_amp: u16 = {
-            let hf_amp: u16 = (encoded_hex_freq as u16 - 0x60) * 4;
+            let hf_amp: u16 = encoded_hex_amp as u16 * 2;
             if hf_amp > 0x01FC {
                 0x01FC
             } else { hf_amp }
@@ -1129,7 +1128,7 @@ pub mod input_report_mode {
 
             fn new(driver: D) -> JoyConResult<Self> {
                 let mut driver = driver;
-                driver.send_sub_command(Self::SUB_COMMAND,Self::ARGS.as_ref())?;
+                driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
                 Ok(SubCommandMode {
                     driver,
@@ -1300,7 +1299,7 @@ pub mod input_report_mode {
                     driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
                 }
 
-                driver.send_sub_command(Self::SUB_COMMAND,Self::ARGS.as_ref())?;
+                driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
                 Ok(StandardFullMode {
                     driver
@@ -1774,7 +1773,7 @@ pub mod lights {
             /// see the [new](#method.new) and [add_phase](#method.add_phase).
             pub fn once(global_mini_cycle_duration: u8, led_start_intensity: u8,
                         led_intensity: u8, fading_transition_duration: u16, led_duration: u16) -> Self {
-                let mut pattern = LightEmittingPattern::new(global_mini_cycle_duration,led_start_intensity, 0u8.into());
+                let mut pattern = LightEmittingPattern::new(global_mini_cycle_duration, led_start_intensity, 0u8.into());
                 pattern.phases_len = Some(0u8.into());
 
                 pattern.add_phase(led_intensity, fading_transition_duration, led_duration)

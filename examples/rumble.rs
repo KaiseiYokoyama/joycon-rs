@@ -33,9 +33,13 @@ fn main() -> JoyConResult<()> {
 
             driver.enable_feature(JoyConFeature::Vibration)?;
 
-            // let rumble = Rumble::new(80.0,0.2);
             let rumble = Rumble::new(300.0,0.9);
             driver.rumble((Some(rumble), Some(rumble)))?;
+
+            std::thread::sleep(std::time::Duration::from_millis(60));
+
+            let stop = Rumble::stop();
+            driver.rumble((Some(stop),Some(stop)))?;
 
             Ok(())
         })?;
