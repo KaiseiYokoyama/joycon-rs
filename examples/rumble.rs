@@ -37,6 +37,9 @@ fn main() -> JoyConResult<()> {
             let rumble = Rumble::new(300.0,0.9);
             driver.rumble((Some(rumble), Some(rumble)))?;
 
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            driver.rumble((None,None))?;
+
             Ok(())
         })?;
 
