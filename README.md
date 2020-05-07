@@ -5,7 +5,7 @@
 <h4 align="center">
     <a href="https://crates.io/crates/joycon-rs"><img src="https://img.shields.io/crates/d/joycon_rs?logo=rust" /></a>
     <a href="https://crates.io/crates/joycon-rs"><img src="https://img.shields.io/crates/v/joycon_rs?logo=rust" /></a>
-    <a href="https://docs.rs/joycon-rs/0.3.1/joycon_rs/"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat&logo=rust" /></a>
+    <a href="https://docs.rs/joycon-rs/"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat&logo=rust" /></a>
     <a href="https://github.com/KaiseiYokoyama/joycon-rs/blob/master/LICENSE"><img src="https://img.shields.io/crates/l/joycon_rs?logo=rust" /></a>
 </h4>
 <h4 align="center">
@@ -20,7 +20,7 @@
     </a>
 </h4>
 <h3 align="center">
-    <a href="https://docs.rs/joycon-rs/0.3.1/joycon_rs/">Documentation</a><span>|</span>
+    <a href="https://docs.rs/joycon-rs/">Documentation</a><span>|</span>
     <a href="https://github.com/KaiseiYokoyama/joycon-rs/tree/master/examples">Examples</a><span>|</span>
     <a href="https://github.com/KaiseiYokoyama/joycon-rs/releases">Changelog</a><span>|</span>
     <a href="https://kaiseiyokoyama.github.io/blog/tags/joycon-rs-v0.3.1/">ドキュメント</a>
