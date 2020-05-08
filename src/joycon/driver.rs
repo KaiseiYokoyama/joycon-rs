@@ -423,6 +423,9 @@ pub trait JoyConDriver {
     /// Read reply from Joy-Con
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize>;
 
+    /// * timeout - milli seconds
+    fn read_timeout(&self, buf: &mut [u8], timeout: i32) -> JoyConResult<usize>;
+
     /// Get global packet number
     fn global_packet_number(&self) -> u8;
 
@@ -551,6 +554,10 @@ impl JoyConDriver for SimpleJoyConDriver {
 
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
         Ok(self.joycon().read(buf)?)
+    }
+
+    fn read_timeout(&self, buf: &mut [u8], timeout: i32) -> JoyConResult<usize> {
+        Ok(self.joycon().read_timeout(buf,timeout)?)
     }
 
     fn global_packet_number(&self) -> u8 {
@@ -875,6 +882,14 @@ pub mod input_report_mode {
         fn read_input_report(&self) -> JoyConResult<Self::Report> {
             let mut buf = [0u8; 362];
             self.driver().read(&mut buf)?;
+
+            Self::Report::try_from(buf)
+        }
+
+        /// * timeout - milli seconds
+        fn read_input_report_timeout(&self, timeout: i32) ->JoyConResult<Self::Report> {
+            let mut buf = [0u8; 362];
+            self.driver().read_timeout(&mut buf, timeout)?;
 
             Self::Report::try_from(buf)
         }
