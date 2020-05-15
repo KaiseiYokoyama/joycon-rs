@@ -42,9 +42,10 @@ fn main() -> JoyConResult<()> {
             driver.set_player_lights(&lights_status.light_up, &lights_status.flash)?;
 
             // Get player lights
-            let lights_status_received = driver.get_player_lights()?.extra.reply;
-
-            assert_eq!(lights_status_received, lights_status);
+            if let SubCommandReply::Checked(reply) = driver.get_player_lights()? {
+                let lights_status_received = reply.extra.reply;
+                assert_eq!(lights_status_received, lights_status);
+            }
 
             Ok(())
         })?;

@@ -280,7 +280,7 @@ pub trait InputReportMode<D: JoyConDriver>: Sized {
     }
 
     /// * timeout - milli seconds
-    fn read_input_report_timeout(&self, timeout: i32) ->JoyConResult<Self::Report> {
+    fn read_input_report_timeout(&self, timeout: i32) -> JoyConResult<Self::Report> {
         let mut buf = [0u8; 362];
         self.driver().read_timeout(&mut buf, timeout)?;
 
@@ -460,12 +460,20 @@ pub mod sub_command_mode {
         const ARGS: Self::ArgsType;
 
         /// The mode remains the same, sending commands and receiving replies.
-        fn once<D>(driver: &mut D) -> JoyConResult<StandardInputReport<SubCommandReport<Self>>>
+        fn once<D>(driver: &mut D) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<Self>>>>
             where Self: std::marker::Sized,
                   D: JoyConDriver
         {
-            let reply = driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
-            StandardInputReport::try_from(reply)
+            match driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref()) {
+                Ok(reply) => {
+                    let ok = match reply {
+                        SubCommandReply::Checked(reply) => SubCommandReply::Checked(StandardInputReport::try_from(reply)?),
+                        SubCommandReply::Unchecked => SubCommandReply::Unchecked
+                    };
+                    Ok(ok)
+                }
+                Err(e) => Err(e)
+            }
         }
     }
 
@@ -706,6 +714,8 @@ pub mod standard_full_mode {
             if !imf_enabled {
                 driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
             }
+
+            driver.set_valid_reply(false);
 
             driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 

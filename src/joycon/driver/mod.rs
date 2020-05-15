@@ -6,6 +6,7 @@ pub use global_packet_number::GlobalPacketNumber;
 pub use joycon_features::{JoyConFeature, IMUConfig};
 pub use simple_joycon_driver::SimpleJoyConDriver;
 use std::sync::{Mutex, MutexGuard};
+use std::hash::Hash;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Rotation {
@@ -106,9 +107,39 @@ mod global_packet_number {
 
 mod simple_joycon_driver;
 
+pub enum SubCommandReply<T> {
+    Checked(T),
+    Unchecked,
+}
+
+impl<T> Clone for SubCommandReply<T> where T: Clone {
+    fn clone(&self) -> Self {
+        match &self {
+            SubCommandReply::Checked(t) => SubCommandReply::Checked(t.clone()),
+            SubCommandReply::Unchecked => SubCommandReply::Unchecked,
+        }
+    }
+}
+
+impl<T> Copy for SubCommandReply<T> where T: Copy {}
+
+impl<T> Debug for SubCommandReply<T> where T: Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            SubCommandReply::Checked(t) => write!(f, "SubCommandReply::Checked({:?})", t),
+            SubCommandReply::Unchecked => write!(f, "SubCommandReply::Unchecked"),
+        }
+    }
+}
+
 pub trait JoyConDriver {
     /// If a sub-command is sent and no ACK packet is returned, tread again for the number of times of this value.
     const ACK_TRY: usize = 5;
+
+    /// If `true`, driver does not read and check reply of sub-command.
+    fn valid_reply(&self) -> bool;
+
+    fn set_valid_reply(&mut self, valid: bool);
 
     /// Send command to Joy-Con
     fn write(&self, data: &[u8]) -> JoyConResult<usize>;
@@ -178,26 +209,31 @@ pub trait JoyConDriver {
     /// # Notice
     /// If you are using non-blocking mode,
     /// it is more likely to fail to validate the sub command reply.
-    fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<[u8; 362]> {
+    fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<SubCommandReply<[u8;362]>> {
         use input_report_mode::sub_command_mode::AckByte;
 
         self.send_command_raw(1, sub_command, data)?;
 
         // check reply
-        std::iter::repeat(())
-            .take(Self::ACK_TRY)
-            .flat_map(|()| {
-                let mut buf = [0u8; 362];
-                self.read(&mut buf).ok()?;
-                let ack_byte = AckByte::from(buf[13]);
+        if self.valid_reply() {
+            std::iter::repeat(())
+                .take(Self::ACK_TRY)
+                .flat_map(|()| {
+                    let mut buf = [0u8; 362];
+                    self.read(&mut buf).ok()?;
+                    let ack_byte = AckByte::from(buf[13]);
 
-                match ack_byte {
-                    AckByte::Ack { .. } => Some(buf),
-                    AckByte::Nack => None
-                }
-            })
-            .next()
-            .ok_or(JoyConError::SubCommandError(sub_command, Vec::new()))
+                    match ack_byte {
+                        AckByte::Ack { .. } => Some(buf),
+                        AckByte::Nack => None
+                    }
+                })
+                .next()
+                .map(SubCommandReply::Checked)
+                .ok_or(JoyConError::SubCommandError(sub_command, Vec::new()))
+        } else {
+            Ok(SubCommandReply::Unchecked)
+        }
     }
 
     /// Send command, sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
@@ -215,7 +251,7 @@ pub trait JoyConDriver {
 
     /// Send sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
-    fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<[u8; 362]> {
+    fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<SubCommandReply<[u8;362]>> {
         self.send_sub_command_raw(sub_command as u8, data)
     }
 

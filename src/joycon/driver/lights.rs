@@ -380,7 +380,7 @@ pub trait Lights: JoyConDriver {
     /// Player lights will be...
     /// > [SL Button] 🤔💡🤔🤔 [SR Button]
     ///
-    fn set_player_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<[u8; 362]> {
+    fn set_player_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<SubCommandReply<[u8; 362]>> {
         let arg = light_up.iter()
             .map(|&lu| lu as u8)
             .sum::<u8>()
@@ -413,7 +413,7 @@ pub trait Lights: JoyConDriver {
     /// dbg!(player_lights_status);
     /// ```
     ///
-    fn get_player_lights(&mut self) -> JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>
+    fn get_player_lights(&mut self) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<LightsStatus>>>>
         where Self: std::marker::Sized
     {
         LightsStatus::once(self)
@@ -442,7 +442,7 @@ pub trait Lights: JoyConDriver {
     ///         .add_phase(0,500,0);
     /// let player_lights_status = joycon_driver.set_home_light(&pattern);
     /// ```
-    fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<[u8; 362]> {
+    fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<SubCommandReply<[u8; 362]>> {
         let arg: [u8; 25] = pattern.clone().into();
         self.send_sub_command(SubCommand::SetHOMELight, &arg)
     }

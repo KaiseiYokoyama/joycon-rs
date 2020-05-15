@@ -5,6 +5,7 @@ pub use driver::{
     Rotation,
     Rumble,
     joycon_features,
+    SubCommandReply,
     JoyConDriver,
     GlobalPacketNumber,
     SimpleJoyConDriver,
