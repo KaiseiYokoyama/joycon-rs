@@ -55,7 +55,22 @@ impl SimpleJoyConDriver {
             global_packet_number: GlobalPacketNumber::default(),
         };
 
-        driver.reset()?;
+        let check_reply = {
+            let device = match joycon.lock() {
+                Ok(d) => d,
+                Err(e) => e.into_inner(),
+            };
+            match device.device_type() {
+                JoyConDeviceType::ProCon => false,
+                _ => true,
+            }
+        };
+
+        if check_reply {
+            driver.reset()?;
+        } else {
+            let _ = driver.reset();
+        }
 
         Ok(driver)
     }
