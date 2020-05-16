@@ -206,14 +206,14 @@ mod common {
     /// Common parts of the standard input report
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct CommonReport {
-        input_report_id: u8,
-        timer: u8,
-        battery: Battery,
-        connection_info: ConnectionInfo,
-        pushed_buttons: PushedButtons,
-        left_analog_stick_data: AnalogStickData,
-        right_analog_stick_data: AnalogStickData,
-        vibrator_input_report: u8,
+        pub input_report_id: u8,
+        pub timer: u8,
+        pub battery: Battery,
+        pub connection_info: ConnectionInfo,
+        pub pushed_buttons: PushedButtons,
+        pub left_analog_stick_data: AnalogStickData,
+        pub right_analog_stick_data: AnalogStickData,
+        pub vibrator_input_report: u8,
     }
 
     impl TryFrom<[u8; 13]> for CommonReport {
