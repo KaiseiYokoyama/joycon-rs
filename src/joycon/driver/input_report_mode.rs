@@ -143,6 +143,12 @@ mod common {
             Buttons::L,
             Buttons::ZL,
         ];
+
+        pub fn contains(&self, button: &Buttons) -> bool {
+            self.right.contains(button)
+            || self.shared.contains(button)
+            || self.left.contains(button)
+        }
     }
 
     impl From<[u8; 3]> for PushedButtons {
