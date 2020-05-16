@@ -80,11 +80,11 @@
 //! use joycon_rs::joycon::input_report_mode::sub_command_mode::SubCommandReport;
 //!
 //! let (tx, rx) =
-//!     std::sync::mpsc::channel::<JoyConResult<StandardInputReport<SubCommandReport<LightsStatus>>>>();
+//!     std::sync::mpsc::channel::<JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<LightsStatus>>>>>();
 //!
 //! // Receive status of player lights
 //! std::thread::spawn(move ||{
-//!     while let Ok(Ok(light_status)) = rx.recv() {
+//!     while let Ok(Ok(SubCommandReply::Checked(light_status))) = rx.recv() {
 //!         assert_eq!(
 //!             light_status.extra.reply,
 //!             LightsStatus {

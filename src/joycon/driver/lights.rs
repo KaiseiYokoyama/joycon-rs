@@ -19,10 +19,10 @@
 //! joycon_driver.set_player_lights(&vec![LightUp::LED2], &vec![Flash::LED3]).unwrap();
 //!
 //! // Get status of player lights
-//! let player_lights_status = joycon_driver.get_player_lights()
-//!     .unwrap()
-//!     .extra;
-//! dbg!(player_lights_status);
+//! if let Ok(SubCommandReply::Checked(checked_reply)) = joycon_driver.get_player_lights() {
+//!     let player_lights_status = checked_reply.extra;
+//!     dbg!(player_lights_status);
+//! };
 //! ```
 
 use super::{*, input_report_mode::sub_command_mode::*};
@@ -407,10 +407,10 @@ pub trait Lights: JoyConDriver {
     /// #                     .remove(0);
     /// #
     /// # let mut joycon_driver = SimpleJoyConDriver::new(&device).unwrap();
-    /// let player_lights_status = joycon_driver.get_player_lights()
-    ///     .unwrap()
-    ///     .extra;
-    /// dbg!(player_lights_status);
+    /// if let Ok(SubCommandReply::Checked(checked_reply)) = joycon_driver.get_player_lights() {
+    ///     let player_lights_status = checked_reply.extra;
+    ///     dbg!(player_lights_status);
+    /// };
     /// ```
     ///
     fn get_player_lights(&mut self) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<LightsStatus>>>>
