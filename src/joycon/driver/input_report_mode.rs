@@ -81,8 +81,8 @@ mod common {
     /// Connection info
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub struct ConnectionInfo {
-        device: Device,
-        is_powered: bool,
+        pub device: Device,
+        pub is_powered: bool,
     }
 
     impl TryFrom<u8> for ConnectionInfo {
@@ -106,9 +106,9 @@ mod common {
     /// Button status
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct PushedButtons {
-        right: Vec<Buttons>,
-        shared: Vec<Buttons>,
-        left: Vec<Buttons>,
+        pub right: Vec<Buttons>,
+        pub shared: Vec<Buttons>,
+        pub left: Vec<Buttons>,
     }
 
     impl PushedButtons {
@@ -187,8 +187,8 @@ mod common {
     /// Analog stick data
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct AnalogStickData {
-        horizontal: u16,
-        vertical: u16,
+        pub horizontal: u16,
+        pub vertical: u16,
     }
 
     impl From<[u8; 3]> for AnalogStickData {
