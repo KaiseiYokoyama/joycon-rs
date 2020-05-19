@@ -268,8 +268,8 @@ mod common {
 }
 
 pub trait InputReportMode<D: JoyConDriver>: Sized {
-    type Report: TryFrom<[u8; 362], Error=JoyConError>;
-    type ArgsType: AsRef<[u8]>;
+    type Report: 'static + Send +  TryFrom<[u8; 362], Error=JoyConError>;
+    type ArgsType: 'static + Send + Copy + AsRef<[u8]>;
 
     const SUB_COMMAND: SubCommand;
     const ARGS: Self::ArgsType;
@@ -460,7 +460,7 @@ pub mod sub_command_mode {
     /// }
     /// ```
     pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
-        type ArgsType: AsRef<[u8]>;
+        type ArgsType: 'static + Send + Copy + AsRef<[u8]>;
         const SUB_COMMAND: SubCommand;
         const ARGS: Self::ArgsType;
 
