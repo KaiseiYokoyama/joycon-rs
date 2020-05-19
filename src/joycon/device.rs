@@ -22,14 +22,14 @@ impl JoyConDevice {
 
     pub fn check_type_of_device(device_info: &DeviceInfo) -> JoyConResult<JoyConDeviceType> {
         if device_info.vendor_id() != JoyConDevice::VENDOR_ID {
-            Err(JoyConDeviceError::InvalidVendorID(device_info.vendor_id()))?;
+            return Err(JoyConDeviceError::InvalidVendorID(device_info.vendor_id()).into());
         }
 
         match device_info.product_id() {
             JoyConDevice::PRODUCT_ID_JOYCON_L => Ok(JoyConDeviceType::JoyConL),
             JoyConDevice::PRODUCT_ID_JOYCON_R => Ok(JoyConDeviceType::JoyConR),
             JoyConDevice::PRODUCT_ID_PROCON => Ok(JoyConDeviceType::ProCon),
-            other => Err(JoyConDeviceError::InvalidProductID(other))?,
+            other => Err(JoyConDeviceError::InvalidProductID(other).into()),
         }
     }
 
