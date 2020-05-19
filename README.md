@@ -26,13 +26,13 @@
     <a href="https://kaiseiyokoyama.github.io/blog/tags/joycon-rs-v0.3.1/">ドキュメント</a>
 </h3>
 
-A framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently.
+A framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently via Bluetooth.
 
 `Joycon-rs` provides utility to find communicate with, and operate Joy-Con. 
 Please see the documentation comments for detailed instructions on how to use it.
 
- Joycon-rs is in development and is still incomplete.
- Please be aware the update will include breaking changes for the time being. Pardon out dust!
+Joycon-rs is in development and is still incomplete.
+Please be aware the update will include breaking changes for the time being. Pardon out dust!
 
 ## Setup
 On macOS or Windows, there are no preparation.
