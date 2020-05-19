@@ -39,11 +39,11 @@ pub struct Rumble {
 }
 
 impl Rumble {
-    pub fn frequency(&self) -> f32 {
+    pub fn frequency(self) -> f32 {
         self.frequency
     }
 
-    pub fn amplitude(&self) -> f32 {
+    pub fn amplitude(self) -> f32 {
         self.amplitude
     }
 
@@ -73,7 +73,7 @@ impl Rumble {
     }
 
     /// The amplitudes over 1.003 are not safe for the integrity of the linear resonant actuators.
-    pub fn is_safe(&self) -> bool {
+    pub fn is_safe(self) -> bool {
         self.amplitude < 1.003
     }
 
@@ -130,8 +130,8 @@ impl Into<[u8; 4]> for Rumble {
         buf[1] = (hf_amp + (hf_freq.wrapping_shr(8) & 0xFF)) as u8; //Add amp + 1st byte of frequency to amplitude byte
 
         // LF: Byte swapping
-        buf[2] = lf_freq.saturating_add(lf_amp.wrapping_shr(8) & 0xFF);
-        buf[3] = lf_amp & 0xFF;
+        buf[2] = lf_freq.saturating_add(lf_amp.wrapping_shr(8));
+        buf[3] = lf_amp;
 
         buf
     }

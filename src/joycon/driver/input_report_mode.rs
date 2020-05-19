@@ -25,7 +25,7 @@
 
 use super::*;
 pub use common::*;
-pub use self::{sub_command_mode::SubCommandMode, standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
+pub use self::{standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
 use std::convert::TryFrom;
 use std::hash::Hash;
 
@@ -64,7 +64,7 @@ mod common {
                 4 => BatteryLevel::Low,
                 6 => BatteryLevel::Medium,
                 8 => BatteryLevel::Full,
-                _ => Err(JoyConReportError::InvalidStandardInputReport(InvalidStandardInputReport::Battery(value)))?
+                _ => return Err(JoyConReportError::InvalidStandardInputReport(InvalidStandardInputReport::Battery(value)).into())
             };
 
             Ok(Battery { level, is_charging })
@@ -92,7 +92,7 @@ mod common {
             let device = match (value >> 1) & 3 {
                 3 => Device::JoyCon,
                 0 => Device::ProConOrChargingGrip,
-                _ => Err(InvalidStandardInputReport::ConnectionInfo(value))?
+                _ => return Err(InvalidStandardInputReport::ConnectionInfo(value).into())
             };
             let is_powered = (value & 1) == 1;
 
@@ -144,10 +144,10 @@ mod common {
             Buttons::ZL,
         ];
 
-        pub fn contains(&self, button: &Buttons) -> bool {
-            self.right.contains(button)
-            || self.shared.contains(button)
-            || self.left.contains(button)
+        pub fn contains(&self, button: Buttons) -> bool {
+            self.right.contains(&button)
+                || self.shared.contains(&button)
+                || self.left.contains(&button)
         }
     }
 
@@ -163,7 +163,7 @@ mod common {
                     let idx = 2u8.pow(*idx as u32) as u8;
                     right_val & idx == idx
                 })
-                .map(|(_, b)| b.clone())
+                .map(|(_, b)| *b)
                 .collect();
             let shared = PushedButtons::SHARED_BUTTONS.iter()
                 .enumerate()
@@ -171,7 +171,7 @@ mod common {
                     let idx = 2u8.pow(*idx as u32) as u8;
                     shared_val & idx == idx
                 })
-                .map(|(_, b)| b.clone())
+                .map(|(_, b)| *b)
                 .collect();
             let left = PushedButtons::LEFT_BUTTONS.iter()
                 .enumerate()
@@ -179,7 +179,7 @@ mod common {
                     let idx = 2u8.pow(*idx as u32) as u8;
                     left_val & idx == idx
                 })
-                .map(|(_, b)| b.clone())
+                .map(|(_, b)| *b)
                 .collect();
 
             PushedButtons {
@@ -811,7 +811,7 @@ pub mod simple_hid_mode {
                 6 => Left,
                 7 => UpperLeft,
                 8 => Neutral,
-                v => Err(InvalidSimpleHIDReport::InvalidStickDirection(v))?,
+                v => return Err(InvalidSimpleHIDReport::InvalidStickDirection(v).into()),
             };
 
             Ok(button)

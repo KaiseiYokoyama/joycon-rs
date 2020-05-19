@@ -31,8 +31,8 @@ fn main() -> JoyConResult<()> {
             let tx = tx.clone();
 
             std::thread::spawn(move || {
-                driver.set_player_lights(&vec![], &vec![]).unwrap();
-                driver.set_player_lights(&vec![LightUp::LED1], &vec![Flash::LED1]).unwrap();
+                driver.set_player_lights(&[], &[]).unwrap();
+                driver.set_player_lights(&[LightUp::LED1], &[Flash::LED1]).unwrap();
                 tx.send(driver.get_player_lights()).unwrap();
             });
 

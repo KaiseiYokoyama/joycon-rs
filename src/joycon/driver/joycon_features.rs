@@ -95,6 +95,7 @@ pub mod imu_sensitivity {
         }
     }
 
+    #[allow(clippy::derive_hash_xor_eq)]
     impl Hash for IMUConfig {
         fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
             // Returns constant value.

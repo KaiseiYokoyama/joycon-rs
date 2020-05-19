@@ -284,7 +284,7 @@ pub mod home_button {
                 {
                     let even_led_intensity = even.led_intensity;
                     let odd_led_intensity = odd.map(|odd| odd.led_intensity)
-                        .unwrap_or(0u8.into());
+                        .unwrap_or_else(|| 0u8.into());
 
                     buf[buf_index] = nibbles_to_u8(even_led_intensity, odd_led_intensity);
                     buf_index += 1;
@@ -380,7 +380,7 @@ pub trait Lights: JoyConDriver {
     /// Player lights will be...
     /// > [SL Button] 🤔💡🤔🤔 [SR Button]
     ///
-    fn set_player_lights(&mut self, light_up: &Vec<LightUp>, flash: &Vec<Flash>) -> JoyConResult<SubCommandReply<[u8; 362]>> {
+    fn set_player_lights(&mut self, light_up: &[LightUp], flash: &[Flash]) -> JoyConResult<SubCommandReply<[u8; 362]>> {
         let arg = light_up.iter()
             .map(|&lu| lu as u8)
             .sum::<u8>()

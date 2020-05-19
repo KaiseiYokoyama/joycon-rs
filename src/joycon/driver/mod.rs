@@ -163,7 +163,7 @@ pub trait JoyConDriver {
     /// If Joy-Con's rumble feature isn't activated, activate it.
     fn rumble(&mut self, rumble_l_r: (Option<Rumble>, Option<Rumble>)) -> JoyConResult<usize> {
         if !self.enabled_features().contains(&JoyConFeature::Vibration) {
-            self.enable_feature(JoyConFeature::Vibration);
+            self.enable_feature(JoyConFeature::Vibration)?;
         }
         self.set_rumble_status(rumble_l_r);
         self.send_command_raw(Command::Rumble as u8, 0, &[])
@@ -230,7 +230,7 @@ pub trait JoyConDriver {
                 })
                 .next()
                 .map(SubCommandReply::Checked)
-                .ok_or(JoyConError::SubCommandError(sub_command, Vec::new()))
+                .ok_or_else(|| JoyConError::SubCommandError(sub_command, Vec::new()))
         } else {
             Ok(SubCommandReply::Unchecked)
         }
@@ -290,7 +290,7 @@ pub mod device_info {
                 0 => JoyConDeviceType::JoyConL,
                 1 => JoyConDeviceType::JoyConR,
                 2 => JoyConDeviceType::ProCon,
-                _ => Err(())?
+                _ => return Err(())
             };
 
             Ok(kind)

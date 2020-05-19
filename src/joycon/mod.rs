@@ -11,7 +11,7 @@ pub use driver::{
     SimpleJoyConDriver,
     Command,
     SubCommand,
-    input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode, SubCommandMode},
+    input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode},
     lights,
     device_info,
 };

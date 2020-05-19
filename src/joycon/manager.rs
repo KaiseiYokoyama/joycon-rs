@@ -96,15 +96,13 @@ impl JoyConManager {
                                 tx.send(new_device)
                             });
                         if send_result.is_err() {
-                            return ();
+                            return;
                         }
                     }
 
                     // Sleep
                     std::thread::sleep(manager.scan_interval)
                 }
-
-                return ();
             })
         };
 
@@ -172,23 +170,20 @@ impl JoyConManager {
         {
             let removed_keys = previous_device_serials.difference(&detected_device_serials);
             removed_keys.for_each(|key| {
-                self.devices
-                    .get(&key)
-                    .map(|device| {
-                        let mut device = match device.lock() {
-                            Ok(d) => d,
-                            Err(e) => e.into_inner()
-                        };
+                if let Some(device) = self.devices.get(&key) {
+                    let mut device = match device.lock() {
+                        Ok(d) => d,
+                        Err(e) => e.into_inner()
+                    };
 
-                        device.forget_device();
-                    });
+                    device.forget_device();
+                }
             });
         }
 
         // reconnected
         {
             let reconnected_keys = previous_device_serials.intersection(&detected_device_serials)
-                .into_iter()
                 .filter(|&k| {
                     if let Some(device) = self.devices.get(k) {
                         !match device.lock() {
@@ -242,7 +237,6 @@ impl JoyConManager {
     /// It may contains disconnected ones.
     pub fn managed_devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>> {
         self.devices.values()
-            .into_iter()
             .map(|d| Arc::clone(d))
             .collect()
     }
