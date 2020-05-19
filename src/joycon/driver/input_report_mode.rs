@@ -390,7 +390,6 @@ impl<EX> Eq for StandardInputReport<EX>
 /// [`SubCommandReplyData`]: trait.SubCommandReplyData.html
 pub mod sub_command_mode {
     use super::*;
-    use std::marker::PhantomData;
 
     /// Ack byte. If it is ACK, it contains data type.
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -527,47 +526,6 @@ pub mod sub_command_mode {
                 sub_command_id,
                 reply,
             })
-        }
-    }
-
-    /// Receive standard input report with sub-command's reply.
-    #[deprecated]
-    pub struct SubCommandMode<D, RD>
-        where D: JoyConDriver, RD: SubCommandReplyData
-    {
-        driver: D,
-        _phantom: PhantomData<RD>,
-    }
-
-    impl<D, RD> InputReportMode<D> for SubCommandMode<D, RD>
-        where D: JoyConDriver,
-              RD: SubCommandReplyData
-    {
-        type Report = StandardInputReport<SubCommandReport<RD>>;
-        type ArgsType = RD::ArgsType;
-        const SUB_COMMAND: SubCommand = RD::SUB_COMMAND;
-        const ARGS: Self::ArgsType = RD::ARGS;
-
-        fn new(driver: D) -> JoyConResult<Self> {
-            let mut driver = driver;
-            driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
-
-            Ok(SubCommandMode {
-                driver,
-                _phantom: PhantomData,
-            })
-        }
-
-        fn driver(&self) -> &D {
-            &self.driver
-        }
-
-        fn driver_mut(&mut self) -> &mut D {
-            &mut self.driver
-        }
-
-        fn into_driver(self) -> D {
-            self.driver
         }
     }
 }
