@@ -208,24 +208,24 @@ pub mod calibration {
 
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct AxisCalibration {
-        max: u16,
-        center: u16,
-        min: u16,
+        max: i16,
+        center: i16,
+        min: i16,
     }
 
     impl AxisCalibration {
         /// Max above center
-        pub fn max(&self) -> u16 {
+        pub fn max(&self) -> i16 {
             self.max
         }
 
         /// Center
-        pub fn center(&self) -> u16 {
+        pub fn center(&self) -> i16 {
             self.center
         }
 
         /// Min above center
-        pub fn min(&self) -> u16 {
+        pub fn min(&self) -> i16 {
             self.min
         }
     }
@@ -270,7 +270,7 @@ pub mod calibration {
             let left_stick_calibration = {
                 let left_stick_cal = &stick_cal[0..9];
                 if left_stick_cal.iter()
-                    .all(|u| u == &0xF) {
+                    .all(|u| u == &0xFF) {
                     None
                 } else {
                     let left_stick_data = stick_cal_to_data(&stick_cal[0..9]);
@@ -278,14 +278,14 @@ pub mod calibration {
                     let left_stick_calibration =
                         StickCalibration {
                             x: AxisCalibration {
-                                center: left_stick_data[2],
-                                max: left_stick_data[2] + left_stick_data[0],
-                                min: left_stick_data[2] - left_stick_data[4],
+                                center: left_stick_data[2] as i16,
+                                max: left_stick_data[2] as i16 + left_stick_data[0] as i16,
+                                min: left_stick_data[2] as i16 - left_stick_data[4] as i16,
                             },
                             y: AxisCalibration {
-                                center: left_stick_data[3],
-                                max: left_stick_data[3] + left_stick_data[1],
-                                min: left_stick_data[3] - left_stick_data[5],
+                                center: left_stick_data[3] as i16,
+                                max: left_stick_data[3] as i16 + left_stick_data[1] as i16,
+                                min: left_stick_data[3] as i16 - left_stick_data[5] as i16,
                             },
                         };
 
@@ -296,7 +296,7 @@ pub mod calibration {
             let right_stick_calibration = {
                 let right_stick_cal = &stick_cal[9..18];
                 if right_stick_cal.iter()
-                    .all(|u| u == &0xF) {
+                    .all(|u| u == &0xFF) {
                     None
                 } else {
                     let right_stick_data = stick_cal_to_data(right_stick_cal);
@@ -304,14 +304,14 @@ pub mod calibration {
                     let right_stick_calibration =
                         StickCalibration {
                             x: AxisCalibration {
-                                center: right_stick_data[0],
-                                max: right_stick_data[0] + right_stick_data[4],
-                                min: right_stick_data[0] - right_stick_data[2],
+                                center: right_stick_data[0] as i16,
+                                max: right_stick_data[0] as i16 + right_stick_data[4] as i16,
+                                min: right_stick_data[0] as i16 - right_stick_data[2] as i16,
                             },
                             y: AxisCalibration {
-                                center: right_stick_data[1],
-                                max: right_stick_data[1] + right_stick_data[5],
-                                min: right_stick_data[1] - right_stick_data[3],
+                                center: right_stick_data[1] as i16,
+                                max: right_stick_data[1] as i16 + right_stick_data[5] as i16,
+                                min: right_stick_data[1] as i16 - right_stick_data[3] as i16,
                             },
                         };
 
