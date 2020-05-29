@@ -46,7 +46,7 @@ pub mod calibration {
             },
             Unavailable,
         }
-        
+
         #[derive(Debug, Clone, Hash, Eq, PartialEq)]
         pub struct JoyConSticksCalibration {
             left: StickCalibration,
@@ -322,6 +322,66 @@ pub mod calibration {
     }
 }
 
+pub mod color {
+    use super::*;
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    pub struct Color {
+        /// Controller body color. ex. [30, 220, 0] (Splatoon2 green)
+        pub body: [u8; 3],
+        pub buttons: [u8; 3],
+        pub left_grip: Option<[u8; 3]>,
+        pub right_grip: Option<[u8; 3]>,
+    }
+
+    impl From<[u8; 12]> for Color {
+        fn from(array: [u8; 12]) -> Self {
+            let body = [array[0], array[1], array[2]];
+            let buttons = [array[3], array[4], array[5]];
+            let left_grip = if array[6..9].iter().all(|a| a == &0xFF) {
+                None
+            } else {
+                Some([array[6], array[7], array[8]])
+            };
+            let right_grip = if array[9..12].iter().all(|a| a == &0xFF) {
+                None
+            } else {
+                Some([array[9], array[10], array[11]])
+            };
+
+            Color {
+                body,
+                buttons,
+                left_grip,
+                right_grip,
+            }
+        }
+    }
+
+    pub fn get_color(device: &HidDevice) -> Option<Color> {
+        device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x50, 0x60, 0, 0, 12])
+            .ok()?;
+
+        for _ in 0..5 {
+            let mut buf = [0u8; 64];
+            device.read_timeout(&mut buf, 20)
+                .ok()?;
+
+            match buf[14..20] {
+                [0x10, 0x50, 0x60, 0, 0, 12] => {}
+                _ => continue,
+            }
+
+            let mut report = [0u8; 12];
+            report.copy_from_slice(&buf[20..32]);
+
+            return Some(Color::from(report));
+        }
+
+        None
+    }
+}
+
 
 pub struct JoyConDevice {
     hid_device: Option<HidDevice>,
@@ -331,6 +391,7 @@ pub struct JoyConDevice {
     stick_user_calibration: calibration::stick::JoyConSticksCalibration,
     imu_factory_calibration: calibration::imu::IMUCalibration,
     imu_user_calibration: calibration::imu::IMUCalibration,
+    color: color::Color,
 }
 
 impl JoyConDevice {
@@ -376,6 +437,8 @@ impl JoyConDevice {
         &self.imu_user_calibration
     }
 
+    pub fn color(&self) -> &color::Color { &self.color }
+
     /// Set blocking mode.
     ///
     /// # Notice
@@ -416,6 +479,8 @@ impl JoyConDevice {
             .ok_or(JoyConDeviceError::FailedIMUCalibrationLoading)?;
         let imu_user_calibration = calibration::imu::get_user_calibration(&hid_device)
             .ok_or(JoyConDeviceError::FailedIMUCalibrationLoading)?;
+        let color = color::get_color(&hid_device)
+            .ok_or(JoyConDeviceError::FailedColorLoading)?;
 
         Ok(
             JoyConDevice {
@@ -426,6 +491,7 @@ impl JoyConDevice {
                 stick_user_calibration,
                 imu_factory_calibration,
                 imu_user_calibration,
+                color,
             }
         )
     }
@@ -470,7 +536,7 @@ impl JoyConDevice {
 
 impl Debug for JoyConDevice {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "JoyConDevice {{ hid_device: {}, serial_number: {}, device_type: {:?}, stick_factory_calibration: {:?}, stick_user_calibration: {:?}, imu_factory_calibration: {:?}, imu_user_calibration: {:?} }}",
+        writeln!(f, "JoyConDevice {{ hid_device: {}, serial_number: {}, device_type: {:?}, stick_factory_calibration: {:?}, stick_user_calibration: {:?}, imu_factory_calibration: {:?}, imu_user_calibration: {:?}, color: {:?} }}",
                  if self.is_connected() {
                      "Connected"
                  } else { "Disconnected" },
@@ -479,7 +545,8 @@ impl Debug for JoyConDevice {
                  &self.stick_factory_calibration,
                  &self.stick_user_calibration,
                  &self.imu_factory_calibration,
-                 &self.imu_user_calibration
+                 &self.imu_user_calibration,
+                 &self.color,
         )
     }
 }

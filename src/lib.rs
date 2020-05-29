@@ -188,6 +188,7 @@ pub mod result {
         InvalidProductID(u16),
         FailedStickCalibrationLoading,
         FailedIMUCalibrationLoading,
+        FailedColorLoading,
     }
 
     impl From<JoyConDeviceError> for JoyConError {
