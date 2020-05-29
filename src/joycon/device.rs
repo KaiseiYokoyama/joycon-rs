@@ -180,6 +180,75 @@ pub mod calibration {
 
             None
         }
+
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct StickParameters {
+            dead_zone: u16,
+            range_ratio: u16,
+        }
+
+        impl StickParameters {
+            pub fn dead_zone(&self) -> u16 {
+                self.dead_zone
+            }
+
+            pub fn range_ratio(&self) -> u16 {
+                self.range_ratio
+            }
+        }
+
+        impl From<[u8; 18]> for StickParameters {
+            fn from(array: [u8; 18]) -> Self {
+                fn decode(stick_cal: &[u8]) -> [u16; 12] {
+                    let mut data = [0u16; 12];
+
+                    data[0] = ((stick_cal[1] as u16) << 8) & 0xF00 | stick_cal[0] as u16;
+                    data[1] = ((stick_cal[2] as u16) << 4) | ((stick_cal[1] as u16) >> 4);
+                    data[2] = ((stick_cal[4] as u16) << 8) & 0xF00 | stick_cal[3] as u16;
+                    data[3] = ((stick_cal[5] as u16) << 4) | ((stick_cal[4] as u16) >> 4);
+                    data[4] = ((stick_cal[7] as u16) << 8) & 0xF00 | stick_cal[6] as u16;
+                    data[5] = ((stick_cal[8] as u16) << 4) | ((stick_cal[7] as u16) >> 4);
+                    data[6] = ((stick_cal[10] as u16) << 8) & 0xF00 | stick_cal[9] as u16;
+                    data[7] = ((stick_cal[11] as u16) << 4) | ((stick_cal[10] as u16) >> 4);
+                    data[8] = ((stick_cal[13] as u16) << 8) & 0xF00 | stick_cal[12] as u16;
+                    data[9] = ((stick_cal[14] as u16) << 4) | ((stick_cal[13] as u16) >> 4);
+                    data[10] = ((stick_cal[16] as u16) << 8) & 0xF00 | stick_cal[15] as u16;
+                    data[11] = ((stick_cal[17] as u16) << 4) | ((stick_cal[16] as u16) >> 4);
+
+                    data
+                }
+
+                let decoded = decode(&array);
+
+                StickParameters {
+                    dead_zone: decoded[2],
+                    range_ratio: decoded[3],
+                }
+            }
+        }
+
+        pub fn get_parameters(device: &HidDevice) -> Option<StickParameters> {
+            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x86, 0x60, 0, 0, 18])
+                .ok()?;
+
+            for _ in 0..5 {
+                let mut buf = [0u8; 64];
+                device.read_timeout(&mut buf, 20)
+                    .ok()?;
+
+                match buf[14..20] {
+                    [0x10, 0x86, 0x60, 0, 0, 18] => {}
+                    _ => continue,
+                }
+
+                let mut report = [0u8; 18];
+                report.copy_from_slice(&buf[20..38]);
+
+                return Some(StickParameters::from(report));
+            }
+
+            None
+        }
     }
 
     pub mod imu {
@@ -319,6 +388,50 @@ pub mod calibration {
 
             None
         }
+
+        #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+        pub struct IMUOffsets {
+            x: i16,
+            y: i16,
+            z: i16,
+        }
+
+        impl From<[u8; 6]> for IMUOffsets {
+            fn from(array: [u8; 6]) -> Self {
+                let x = i16::from_le_bytes([array[0], array[1]]);
+                let y = i16::from_le_bytes([array[2], array[3]]);
+                let z = i16::from_le_bytes([array[4], array[5]]);
+
+                IMUOffsets {
+                    x,
+                    y,
+                    z,
+                }
+            }
+        }
+
+        pub fn get_offsets(device: &HidDevice) -> Option<IMUOffsets> {
+            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x80, 0x60, 0, 0, 6])
+                .ok()?;
+
+            for _ in 0..5 {
+                let mut buf = [0u8; 64];
+                device.read_timeout(&mut buf, 20)
+                    .ok()?;
+
+                match buf[14..20] {
+                    [0x10, 0x80, 0x60, 0, 0, 6] => {}
+                    _ => continue,
+                }
+
+                let mut report = [0u8; 6];
+                report.copy_from_slice(&buf[20..26]);
+
+                return Some(IMUOffsets::from(report));
+            }
+
+            None
+        }
     }
 }
 
@@ -387,8 +500,10 @@ pub struct JoyConDevice {
     hid_device: Option<HidDevice>,
     serial_number: String,
     device_type: JoyConDeviceType,
+    stick_parameters: calibration::stick::StickParameters,
     stick_factory_calibration: calibration::stick::JoyConSticksCalibration,
     stick_user_calibration: calibration::stick::JoyConSticksCalibration,
+    imu_offsets: calibration::imu::IMUOffsets,
     imu_factory_calibration: calibration::imu::IMUCalibration,
     imu_user_calibration: calibration::imu::IMUCalibration,
     color: color::Color,
@@ -471,10 +586,14 @@ impl JoyConDevice {
         let hid_device = hidapi.open_serial(device_info.vendor_id(),
                                             device_info.product_id(),
                                             serial)?;
+        let stick_parameters = calibration::stick::get_parameters(&hid_device)
+            .ok_or(JoyConDeviceError::FailedStickParameterLoading)?;
         let stick_factory_calibration = calibration::stick::get_factory_calibration(&hid_device)
             .ok_or(JoyConDeviceError::FailedStickCalibrationLoading)?;
         let stick_user_calibration = calibration::stick::get_user_calibration(&hid_device)
             .ok_or(JoyConDeviceError::FailedStickCalibrationLoading)?;
+        let imu_offsets = calibration::imu::get_offsets(&hid_device)
+            .ok_or(JoyConDeviceError::FailedIMUOffsetsLoading)?;
         let imu_factory_calibration = calibration::imu::get_factory_calibration(&hid_device)
             .ok_or(JoyConDeviceError::FailedIMUCalibrationLoading)?;
         let imu_user_calibration = calibration::imu::get_user_calibration(&hid_device)
@@ -487,8 +606,10 @@ impl JoyConDevice {
                 hid_device: Some(hid_device),
                 serial_number: serial.to_string(),
                 device_type,
+                stick_parameters,
                 stick_factory_calibration,
                 stick_user_calibration,
+                imu_offsets,
                 imu_factory_calibration,
                 imu_user_calibration,
                 color,
@@ -536,14 +657,16 @@ impl JoyConDevice {
 
 impl Debug for JoyConDevice {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "JoyConDevice {{ hid_device: {}, serial_number: {}, device_type: {:?}, stick_factory_calibration: {:?}, stick_user_calibration: {:?}, imu_factory_calibration: {:?}, imu_user_calibration: {:?}, color: {:?} }}",
+        writeln!(f, "JoyConDevice {{ hid_device: {}, serial_number: {}, device_type: {:?}, stick_parameters: {:?}, , stick_factory_calibration: {:?}, stick_user_calibration: {:?}, imu_offsets: {:?}, imu_factory_calibration: {:?}, imu_user_calibration: {:?}, color: {:?} }}",
                  if self.is_connected() {
                      "Connected"
                  } else { "Disconnected" },
                  &self.serial_number,
                  &self.device_type,
+                 &self.stick_parameters,
                  &self.stick_factory_calibration,
                  &self.stick_user_calibration,
+                 &self.imu_offsets,
                  &self.imu_factory_calibration,
                  &self.imu_user_calibration,
                  &self.color,
