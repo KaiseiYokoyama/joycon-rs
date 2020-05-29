@@ -536,12 +536,20 @@ impl JoyConDevice {
         &self.serial_number
     }
 
+    pub fn stick_parameters(&self) -> &calibration::stick::StickParameters {
+        &self.stick_parameters
+    }
+
     pub fn stick_factory_calibration(&self) -> &calibration::stick::JoyConSticksCalibration {
         &self.stick_factory_calibration
     }
 
     pub fn stick_user_calibration(&self) -> &calibration::stick::JoyConSticksCalibration {
         &self.stick_user_calibration
+    }
+
+    pub fn imu_offsets(&self) -> &calibration::imu::IMUOffsets {
+        &self.imu_offsets
     }
 
     pub fn imu_factory_calibration(&self) -> &calibration::imu::IMUCalibration {
