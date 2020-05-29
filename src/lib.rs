@@ -186,6 +186,11 @@ pub mod result {
     pub enum JoyConDeviceError {
         InvalidVendorID(u16),
         InvalidProductID(u16),
+        FailedStickParameterLoading,
+        FailedStickCalibrationLoading,
+        FailedIMUOffsetsLoading,
+        FailedIMUCalibrationLoading,
+        FailedColorLoading,
     }
 
     impl From<JoyConDeviceError> for JoyConError {

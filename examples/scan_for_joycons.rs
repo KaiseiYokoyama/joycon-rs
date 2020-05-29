@@ -19,6 +19,7 @@ fn main() -> JoyConResult<()> {
     devices.iter()
         .try_for_each::<_, JoyConResult<()>>(|d| {
             if let Ok(device) = d.lock() {
+                dbg!(&device);
                 let device: &HidDevice = device.deref().try_into()?;
                 println!("{:?}", device.get_product_string()?);
             }
