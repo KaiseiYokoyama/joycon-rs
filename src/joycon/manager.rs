@@ -82,26 +82,30 @@ impl JoyConManager {
 
             std::thread::spawn(move || {
                 while let Some(manager) = manager.upgrade() {
-                    // Get manager
-                    let mut manager = match manager.lock() {
-                        Ok(m) => m,
-                        Err(m) => m.into_inner(),
+                    let interval = {
+                        // Get manager
+                        let mut manager = match manager.lock() {
+                            Ok(m) => m,
+                            Err(m) => m.into_inner(),
+                        };
+
+                        // Send new devices
+                        if let Ok(new_devices) = manager.scan() {
+                            // If mpsc channel is disconnected, end this thread.
+                            let send_result = new_devices.into_iter()
+                                .try_for_each::<_, Result<(), crossbeam_channel::SendError<_>>>(|new_device| {
+                                    tx.send(new_device)
+                                });
+                            if send_result.is_err() {
+                                return;
+                            }
+                        }
+
+                        manager.scan_interval.clone()
                     };
 
-                    // Send new devices
-                    if let Ok(new_devices) = manager.scan() {
-                        // If mpsc channel is disconnected, end this thread.
-                        let send_result = new_devices.into_iter()
-                            .try_for_each::<_, Result<(), crossbeam_channel::SendError<_>>>(|new_device| {
-                                tx.send(new_device)
-                            });
-                        if send_result.is_err() {
-                            return;
-                        }
-                    }
-
                     // Sleep
-                    std::thread::sleep(manager.scan_interval)
+                    std::thread::sleep(interval)
                 }
             })
         };
@@ -287,3 +291,13 @@ impl JoyConManager {
     }
 }
 
+lazy_static! {
+    pub static ref JOYCON_RECEIVER: crossbeam_channel::Receiver<Arc<Mutex<JoyConDevice>>> = {
+        let manager = JoyConManager::get_instance();
+        let manager = match manager.lock() {
+            Ok(manager) => manager,
+            Err(e) => e.into_inner(),
+        };
+        manager.new_devices()
+    };
+}

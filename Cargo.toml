@@ -1,6 +1,6 @@
 [package]
 name = "joycon-rs"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Kaisei Yokoyama <yokoyama.kaisei.sm@alumni.tsukuba.ac.jp>"]
 repository = "https://github.com/KaiseiYokoyama/joycon-rs"
 edition = "2018"
@@ -16,6 +16,7 @@ exclude = ["/images/*"]
 [dependencies]
 hidapi-alt-for-hidapi-issue-127 = "1.2.1"
 crossbeam-channel = "0.4.2"
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 doc-comment = "0.3.3"
