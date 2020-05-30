@@ -145,6 +145,8 @@
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
 //! [Vibration (Rumble)]:joycon/struct.Rumble.html
 extern crate hidapi_alt_for_hidapi_issue_127 as hidapi;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod joycon;
 

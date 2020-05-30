@@ -16,6 +16,7 @@ exclude = ["/images/*"]
 [dependencies]
 hidapi-alt-for-hidapi-issue-127 = "1.2.1"
 crossbeam-channel = "0.4.2"
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 doc-comment = "0.3.3"

@@ -291,3 +291,13 @@ impl JoyConManager {
     }
 }
 
+lazy_static! {
+    pub static ref JOYCON_RECEIVER: crossbeam_channel::Receiver<Arc<Mutex<JoyConDevice>>> = {
+        let manager = JoyConManager::get_instance();
+        let manager = match manager.lock() {
+            Ok(manager) => manager,
+            Err(e) => e.into_inner(),
+        };
+        manager.new_devices()
+    };
+}

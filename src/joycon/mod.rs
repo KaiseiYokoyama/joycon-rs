@@ -15,7 +15,7 @@ pub use driver::{
     lights,
     device_info,
 };
-pub use manager::JoyConManager;
+pub use manager::{JoyConManager, JOYCON_RECEIVER};
 
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
