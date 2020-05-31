@@ -57,6 +57,6 @@ impl<'a> Debug for DebugHidDevice<'a> {
     }
 }
 
-mod device;
+pub mod device;
 mod driver;
 mod manager;
