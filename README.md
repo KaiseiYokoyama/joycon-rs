@@ -206,6 +206,8 @@ fn main() -> JoyConResult<()> {
  - [Deal with LED (Player lights)](examples/player_lights.rs)
  - [Vibration (Rumble)](examples/rumble.rs)
  - [HOME Light](examples/home_light.rs)
+ - Read Joy-Con / Pro Controller color
+ - Read factory / user calibration data
 
 ### Planning
  - Receive NFC/IR data
