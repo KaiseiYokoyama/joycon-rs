@@ -258,9 +258,9 @@ pub trait JoyConDriver {
     /// Initialize Joy-Con's status
     fn reset(&mut self) -> JoyConResult<()> {
         // disable IMU (6-Axis sensor)
-        self.send_sub_command(SubCommand::EnableIMU, &[0x00])?;
+        self.send_sub_command(SubCommand::EnableIMU, &[0x01])?;
         // disable vibration
-        self.send_sub_command(SubCommand::EnableVibration, &[0x00])?;
+        self.send_sub_command(SubCommand::EnableVibration, &[0x01])?;
 
         Ok(())
     }

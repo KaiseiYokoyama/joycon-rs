@@ -48,11 +48,15 @@ impl SimpleJoyConDriver {
         // joycon.set_blocking_mode(true);
         // joycon.set_blocking_mode(false);
 
+        let mut enabled_features = HashSet::new();
+        enabled_features.insert(JoyConFeature::IMUFeature(IMUConfig::default()));
+        enabled_features.insert(JoyConFeature::Vibration);
+
         let mut driver = Self {
             joycon: Arc::clone(joycon),
             rotation: Rotation::Portrait,
             rumble: (None, None),
-            enabled_features: HashSet::new(),
+            enabled_features,
             valid_reply: {
                 let device = match joycon.lock() {
                     Ok(j) => j,
