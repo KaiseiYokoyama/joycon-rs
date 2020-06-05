@@ -577,7 +577,7 @@ pub mod standard_full_mode {
     /// 6-Axis data. 3 frames of 2 groups of 3 Int16LE each. Group is Acc followed by Gyro.
     #[derive(Debug, Clone)]
     pub struct IMUData {
-        data: [AxisData; 3]
+        pub data: [AxisData; 3]
     }
 
     impl TryFrom<[u8; 349]> for IMUData {
