@@ -838,7 +838,7 @@ pub mod simple_hid_mode {
                 input_report_id,
                 pushed_buttons,
                 stick_direction,
-                filter_data,
+                filler_data: filter_data,
             })
         }
     }
