@@ -310,6 +310,7 @@ pub trait InputReportMode<D: JoyConDriver>: Sized {
     fn into_driver(self) -> D;
 }
 
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 /// Standard input report with extra report.
 pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
     pub common: CommonReport,
