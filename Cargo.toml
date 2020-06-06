@@ -1,6 +1,6 @@
 [package]
 name = "joycon-rs"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Kaisei Yokoyama <yokoyama.kaisei.sm@alumni.tsukuba.ac.jp>"]
 repository = "https://github.com/KaiseiYokoyama/joycon-rs"
 edition = "2018"
