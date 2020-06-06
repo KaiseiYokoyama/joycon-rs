@@ -17,6 +17,10 @@ exclude = ["/images/*"]
 hidapi-alt-for-hidapi-issue-127 = "1.2.1"
 crossbeam-channel = "0.4.2"
 lazy_static = "1.4.0"
+serde = { version = "1.0", features = ["derive"] , optional = true }
+
+[features]
+use_serde = ["serde"]
 
 [dev-dependencies]
 doc-comment = "0.3.3"
