@@ -34,6 +34,7 @@ mod common {
     use std::convert::TryFrom;
 
     /// Battery level
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
     pub enum BatteryLevel {
         Empty,
@@ -44,6 +45,7 @@ mod common {
     }
 
     /// Battery info
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub struct Battery {
         pub level: BatteryLevel,
@@ -72,6 +74,7 @@ mod common {
     }
 
     /// Device info
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub enum Device {
         JoyCon,
@@ -79,6 +82,7 @@ mod common {
     }
 
     /// Connection info
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub struct ConnectionInfo {
         pub device: Device,
@@ -104,6 +108,7 @@ mod common {
     }
 
     /// Button status
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct PushedButtons {
         pub right: Vec<Buttons>,
@@ -191,6 +196,7 @@ mod common {
     }
 
     /// Analog stick data
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct AnalogStickData {
         pub horizontal: u16,
@@ -210,6 +216,7 @@ mod common {
     }
 
     /// Common parts of the standard input report
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct CommonReport {
         pub input_report_id: u8,
@@ -303,6 +310,7 @@ pub trait InputReportMode<D: JoyConDriver>: Sized {
     fn into_driver(self) -> D;
 }
 
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 /// Standard input report with extra report.
 pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
     pub common: CommonReport,
@@ -537,6 +545,7 @@ pub mod standard_full_mode {
     use super::*;
 
     /// IMU(6-Axis sensor)'s value.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct AxisData {
         /// Acceleration to X measured
@@ -575,6 +584,7 @@ pub mod standard_full_mode {
     }
 
     /// 6-Axis data. 3 frames of 2 groups of 3 Int16LE each. Group is Acc followed by Gyro.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone)]
     pub struct IMUData {
         pub data: [AxisData; 3]
@@ -712,6 +722,7 @@ pub mod simple_hid_mode {
     use super::*;
 
     #[allow(non_camel_case_types)]
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
     pub enum SimpleHIDButton {
         Down,
@@ -740,6 +751,7 @@ pub mod simple_hid_mode {
     };
 
     /// Hold your controller sideways so that SL, SYNC, and SR line up with the screen. Pushing the stick towards a direction in this table will cause that value to be sent.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
     pub enum StickDirection {
         Up,
@@ -777,12 +789,13 @@ pub mod simple_hid_mode {
     }
 
     /// Pushed buttons and stick direction.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone)]
     pub struct SimpleHIDReport {
         pub input_report_id: u8,
         pub pushed_buttons: Vec<SimpleHIDButton>,
         pub stick_direction: StickDirection,
-        pub filter_data: [u8; 8],
+        pub filler_data: [u8; 8],
     }
 
     impl TryFrom<[u8; 12]> for SimpleHIDReport {
@@ -826,7 +839,7 @@ pub mod simple_hid_mode {
                 input_report_id,
                 pushed_buttons,
                 stick_direction,
-                filter_data,
+                filler_data: filter_data,
             })
         }
     }

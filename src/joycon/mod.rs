@@ -20,6 +20,7 @@ pub use manager::{JoyConManager, JOYCON_RECEIVER};
 use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
 
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Buttons {
     A,
