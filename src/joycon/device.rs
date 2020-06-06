@@ -1,6 +1,7 @@
 use super::*;
 use std::convert::TryInto;
 
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum JoyConDeviceType {
     JoyConL = 0,
