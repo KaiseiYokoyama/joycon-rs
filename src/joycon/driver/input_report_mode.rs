@@ -34,6 +34,7 @@ mod common {
     use std::convert::TryFrom;
 
     /// Battery level
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
     pub enum BatteryLevel {
         Empty,
@@ -44,6 +45,7 @@ mod common {
     }
 
     /// Battery info
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub struct Battery {
         pub level: BatteryLevel,
@@ -72,6 +74,7 @@ mod common {
     }
 
     /// Device info
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub enum Device {
         JoyCon,
@@ -79,6 +82,7 @@ mod common {
     }
 
     /// Connection info
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub struct ConnectionInfo {
         pub device: Device,
@@ -104,6 +108,7 @@ mod common {
     }
 
     /// Button status
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct PushedButtons {
         pub right: Vec<Buttons>,
@@ -191,6 +196,7 @@ mod common {
     }
 
     /// Analog stick data
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct AnalogStickData {
         pub horizontal: u16,
@@ -210,6 +216,7 @@ mod common {
     }
 
     /// Common parts of the standard input report
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct CommonReport {
         pub input_report_id: u8,
@@ -537,6 +544,7 @@ pub mod standard_full_mode {
     use super::*;
 
     /// IMU(6-Axis sensor)'s value.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct AxisData {
         /// Acceleration to X measured
@@ -575,6 +583,7 @@ pub mod standard_full_mode {
     }
 
     /// 6-Axis data. 3 frames of 2 groups of 3 Int16LE each. Group is Acc followed by Gyro.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone)]
     pub struct IMUData {
         pub data: [AxisData; 3]

@@ -158,6 +158,8 @@ extern crate doc_comment;
 doctest!("../README.md");
 
 pub mod prelude {
+    #[cfg(feature = "use_serde")]
+    pub(crate) use serde::{Serialize, Deserialize};
     pub use hidapi::*;
     pub use crossbeam_channel;
     pub use crate::result::*;
