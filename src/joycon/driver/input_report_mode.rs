@@ -721,6 +721,7 @@ pub mod simple_hid_mode {
     use super::*;
 
     #[allow(non_camel_case_types)]
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
     pub enum SimpleHIDButton {
         Down,
@@ -749,6 +750,7 @@ pub mod simple_hid_mode {
     };
 
     /// Hold your controller sideways so that SL, SYNC, and SR line up with the screen. Pushing the stick towards a direction in this table will cause that value to be sent.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
     pub enum StickDirection {
         Up,
@@ -786,12 +788,13 @@ pub mod simple_hid_mode {
     }
 
     /// Pushed buttons and stick direction.
+    #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone)]
     pub struct SimpleHIDReport {
         pub input_report_id: u8,
         pub pushed_buttons: Vec<SimpleHIDButton>,
         pub stick_direction: StickDirection,
-        pub filter_data: [u8; 8],
+        pub filler_data: [u8; 8],
     }
 
     impl TryFrom<[u8; 12]> for SimpleHIDReport {
