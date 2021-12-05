@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 MD014 -->
 <h1 align="center">
     <img align="center" src="https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/joycon-rs.png" width="200"/><br>
     <a href="https://crates.io/crates/joycon-rs">Joycon-rs</a>
@@ -9,14 +10,8 @@
     <a href="https://github.com/KaiseiYokoyama/joycon-rs/blob/master/LICENSE"><img src="https://img.shields.io/crates/l/joycon_rs?logo=rust" /></a>
 </h4>
 <h4 align="center">
-    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions?query=workflow%3A%22Test+on+mac%22">
-        <img src="https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20mac/badge.svg" />
-    </a>
-    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions?query=workflow%3A%22Test+on+windows%22">
-        <img src="https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20windows/badge.svg" />
-    </a>
-    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions?query=workflow%3A%22Test+on+ubuntu%22">
-        <img src="https://github.com/KaiseiYokoyama/joycon-rs/workflows/Test%20on%20ubuntu/badge.svg" />
+    <a href="https://github.com/KaiseiYokoyama/joycon-rs/actions/workflows/test.yml">
+        <img src="https://github.com/KaiseiYokoyama/joycon-rs/actions/workflows/test.yml/badge.svg" />
     </a>
 </h4>
 <h3 align="center">
@@ -28,21 +23,24 @@
 
 A framework for dealing with Nintendo Switch Joy-Con on Rust easily and efficiently via Bluetooth.
 
-`Joycon-rs` provides utility to find communicate with, and operate Joy-Con. 
+`Joycon-rs` provides utility to find communicate with, and operate Joy-Con.
 Please see the documentation comments for detailed instructions on how to use it.
 
 Joycon-rs is in development and is still incomplete.
 Please be aware the update will include breaking changes for the time being. Pardon out dust!
 
 ## Setup
+
 On macOS or Windows, there are no preparation.
 
-On linux, 
+On linux,
+
 ```bash
 $ sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
 ```
 
 ## Usage
+
 First, add dependency to `Cargo.toml`
 
 ```toml
@@ -51,6 +49,7 @@ joycon_rs = "*"
 ```
 
 Then, `use` prelude on `.rs` file.
+
 ```rust
 use joycon_rs::prelude::*;
 ```
@@ -58,6 +57,7 @@ use joycon_rs::prelude::*;
 Perfect! Now you have Joycon-rs available in code.
 
 ### Receive reports
+
 For starters, let's take a simple signal from JoyCon.
 If you use more than one JoyCon, [`mspc`] can be very helpful.
 
@@ -89,9 +89,9 @@ managed_devices.into_iter()
     .try_for_each::<_, JoyConResult<()>>(|driver| {
         // Change JoyCon to Simple hid mode.
         let simple_hid_mode = SimpleHIDMode::new(driver)?;
-    
+
         let tx = tx.clone();
-    
+
         // Spawn thread
         std::thread::spawn( move || {
             loop {
@@ -99,13 +99,14 @@ managed_devices.into_iter()
                 tx.send(simple_hid_mode.read_input_report()).unwrap();
             }
         });
-    
+
         Ok(())
     })
     .unwrap();
 ```
 
 ### Set player lights
+
 Then, lets deal with player lights.
 
 ```rust no_run
@@ -143,6 +144,7 @@ managed_devices.into_iter()
 ```
 
 ### Rumble
+
 ```rust no_run
 use joycon_rs::prelude::*;
 use std::convert::TryInto;
@@ -192,34 +194,38 @@ fn main() -> JoyConResult<()> {
 ```
 
 ### More Examples
+
 [Here](examples).
 
- ## Features
- You can use `Joycon-rs` for...
- - [Manage Joy-Cons](examples/scan_for_joycons.rs)
-     - Connection / Disconnection / Reconnection
- - Send / Receive raw packets (u8 array) to / from Joy-Con
- - Receive input to Joy-Con
-     - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.](examples/simple_hid_report.rs)
-     - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.](examples/standard_full_report.rs)
-     - Get/Set status of Joy-Con
- - [Deal with LED (Player lights)](examples/player_lights.rs)
- - [Vibration (Rumble)](examples/rumble.rs)
- - [HOME Light](examples/home_light.rs)
- - Read Joy-Con / Pro Controller color
- - Read factory / user calibration data
+## Features
+
+You can use `Joycon-rs` for...
+
+- [Manage Joy-Cons](examples/scan_for_joycons.rs)
+  - Connection / Disconnection / Reconnection
+- Send / Receive raw packets (u8 array) to / from Joy-Con
+- Receive input to Joy-Con
+  - [Receive pushed buttons, and stick directions (one of 8 directions) on every button pressed.](examples/simple_hid_report.rs)
+  - [Receive pushed buttons, stick directions (analog value), and 6-Axis sensor at 60Hz.](examples/standard_full_report.rs)
+  - Get/Set status of Joy-Con
+- [Deal with LED (Player lights)](examples/player_lights.rs)
+- [Vibration (Rumble)](examples/rumble.rs)
+- [HOME Light](examples/home_light.rs)
+- Read Joy-Con / Pro Controller color
+- Read factory / user calibration data
 
 ### Planning
- - Receive NFC/IR data
- - Deal with Pro Controller
- 
+
+- Receive NFC/IR data
+- Deal with Pro Controller
+
 ## License
 
-Licensed under Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
+Licensed under Apache License, Version 2.0 ([LICENSE](LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>)
 
 ## Contribution
 
-We gladly accept contributions via GitHub pull requests. 
+We gladly accept contributions via GitHub pull requests.
 If you find a bug in the library, it would be appreciated if you could report it in detail to [Issues] so that it can be reproduced.
 
 [Issues]: https://github.com/KaiseiYokoyama/joycon-rs/issues
