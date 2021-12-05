@@ -144,7 +144,7 @@
 //! [SubCommandMode<D, RD>]: joycon/input_report_mode/sub_command_mode/struct.SubCommandMode.html
 //! [Deal with LED (Player lights)]: joycon/lights/index.html
 //! [Vibration (Rumble)]:joycon/struct.Rumble.html
-extern crate hidapi_alt_for_hidapi_issue_127 as hidapi;
+extern crate hidapi;
 #[macro_use]
 extern crate lazy_static;
 
