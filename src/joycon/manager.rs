@@ -99,7 +99,7 @@ impl JoyConManager {
                             }
                         }
 
-                        manager.scan_interval.clone()
+                        manager.scan_interval
                     };
 
                     // Sleep
@@ -168,7 +168,7 @@ impl JoyConManager {
         {
             let removed_keys = previous_device_serials.difference(&detected_device_serials);
             removed_keys.for_each(|key| {
-                if let Some(device) = self.devices.get(&key) {
+                if let Some(device) = self.devices.get(key) {
                     let mut device = match device.lock() {
                         Ok(d) => d,
                         Err(e) => e.into_inner(),
@@ -242,7 +242,7 @@ impl JoyConManager {
     /// Collection of managed JoyCons.
     /// It may contains disconnected ones.
     pub fn managed_devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>> {
-        self.devices.values().map(|d| Arc::clone(d)).collect()
+        self.devices.values().map(Arc::clone).collect()
     }
 
     /// Receiver of new devices.

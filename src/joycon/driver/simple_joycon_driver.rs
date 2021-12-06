@@ -111,15 +111,15 @@ impl JoyConDriver for SimpleJoyConDriver {
 
     fn write(&self, data: &[u8]) -> JoyConResult<usize> {
         let joycon = self.joycon();
-        Ok(joycon.write(data)?)
+        joycon.write(data)
     }
 
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
-        Ok(self.joycon().read(buf)?)
+        self.joycon().read(buf)
     }
 
     fn read_timeout(&self, buf: &mut [u8], timeout: i32) -> JoyConResult<usize> {
-        Ok(self.joycon().read_timeout(buf, timeout)?)
+        self.joycon().read_timeout(buf, timeout)
     }
 
     fn global_packet_number(&self) -> u8 {
