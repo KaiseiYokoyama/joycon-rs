@@ -23,9 +23,9 @@
 //! [analog stick data]: struct.AnalogStickData.html
 //! [`InputReportMode<D>`]: trait.InputReportMode.html
 
+pub use self::{simple_hid_mode::SimpleHIDMode, standard_full_mode::StandardFullMode};
 use super::*;
 pub use common::*;
-pub use self::{standard_full_mode::StandardFullMode, simple_hid_mode::SimpleHIDMode};
 use std::convert::TryFrom;
 use std::hash::Hash;
 
@@ -57,16 +57,19 @@ mod common {
 
         fn try_from(value: u8) -> Result<Self, Self::Error> {
             let is_charging = value % 2 == 1;
-            let value = if is_charging {
-                value - 1
-            } else { value };
+            let value = if is_charging { value - 1 } else { value };
             let level = match value {
                 0 => BatteryLevel::Empty,
                 2 => BatteryLevel::Critical,
                 4 => BatteryLevel::Low,
                 6 => BatteryLevel::Medium,
                 8 => BatteryLevel::Full,
-                _ => return Err(JoyConReportError::InvalidStandardInputReport(InvalidStandardInputReport::Battery(value)).into())
+                _ => {
+                    return Err(JoyConReportError::InvalidStandardInputReport(
+                        InvalidStandardInputReport::Battery(value),
+                    )
+                    .into())
+                }
             };
 
             Ok(Battery { level, is_charging })
@@ -96,14 +99,11 @@ mod common {
             let device = match (value >> 1) & 3 {
                 3 => Device::JoyCon,
                 0 => Device::ProConOrChargingGrip,
-                _ => return Err(InvalidStandardInputReport::ConnectionInfo(value).into())
+                _ => return Err(InvalidStandardInputReport::ConnectionInfo(value).into()),
             };
             let is_powered = (value & 1) == 1;
 
-            Ok(ConnectionInfo {
-                device,
-                is_powered,
-            })
+            Ok(ConnectionInfo { device, is_powered })
         }
     }
 
@@ -162,7 +162,8 @@ mod common {
             let shared_val = value[1];
             let left_val = value[2];
 
-            let right = PushedButtons::RIGHT_BUTTONS.iter()
+            let right = PushedButtons::RIGHT_BUTTONS
+                .iter()
                 .enumerate()
                 .filter(|(idx, _)| {
                     let idx = 2u8.pow(*idx as u32) as u8;
@@ -170,7 +171,8 @@ mod common {
                 })
                 .map(|(_, b)| *b)
                 .collect();
-            let shared = PushedButtons::SHARED_BUTTONS.iter()
+            let shared = PushedButtons::SHARED_BUTTONS
+                .iter()
                 .enumerate()
                 .filter(|(idx, _)| {
                     let idx = 2u8.pow(*idx as u32) as u8;
@@ -178,7 +180,8 @@ mod common {
                 })
                 .map(|(_, b)| *b)
                 .collect();
-            let left = PushedButtons::LEFT_BUTTONS.iter()
+            let left = PushedButtons::LEFT_BUTTONS
+                .iter()
                 .enumerate()
                 .filter(|(idx, _)| {
                     let idx = 2u8.pow(*idx as u32) as u8;
@@ -241,7 +244,10 @@ mod common {
                 let high_nibble = value / 16;
                 let low_nibble = value % 16;
 
-                (Battery::try_from(high_nibble)?, ConnectionInfo::try_from(low_nibble)?)
+                (
+                    Battery::try_from(high_nibble)?,
+                    ConnectionInfo::try_from(low_nibble)?,
+                )
             };
 
             let pushed_buttons = {
@@ -275,7 +281,7 @@ mod common {
 }
 
 pub trait InputReportMode<D: JoyConDriver>: Sized {
-    type Report: 'static + Send +  TryFrom<[u8; 362], Error=JoyConError>;
+    type Report: 'static + Send + TryFrom<[u8; 362], Error = JoyConError>;
     type ArgsType: 'static + Send + Copy + AsRef<[u8]>;
 
     const SUB_COMMAND: SubCommand;
@@ -312,13 +318,14 @@ pub trait InputReportMode<D: JoyConDriver>: Sized {
 
 #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 /// Standard input report with extra report.
-pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error=JoyConError>> {
+pub struct StandardInputReport<EX: TryFrom<[u8; 349], Error = JoyConError>> {
     pub common: CommonReport,
     pub extra: EX,
 }
 
 impl<EX> TryFrom<[u8; 362]> for StandardInputReport<EX>
-    where EX: TryFrom<[u8; 349], Error=JoyConError>
+where
+    EX: TryFrom<[u8; 349], Error = JoyConError>,
 {
     type Error = JoyConError;
 
@@ -337,28 +344,26 @@ impl<EX> TryFrom<[u8; 362]> for StandardInputReport<EX>
             EX::try_from(data)?
         };
 
-        Ok(StandardInputReport {
-            common,
-            extra,
-        })
+        Ok(StandardInputReport { common, extra })
     }
 }
 
 impl<EX> Debug for StandardInputReport<EX>
-    where EX: TryFrom<[u8; 349], Error=JoyConError> + Debug
+where
+    EX: TryFrom<[u8; 349], Error = JoyConError> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "StandardInputReport {{ common: {:?}, extra: {:?} }}",
-            &self.common,
-            &self.extra,
+            &self.common, &self.extra,
         )
     }
 }
 
 impl<EX> Clone for StandardInputReport<EX>
-    where EX: TryFrom<[u8; 349], Error=JoyConError> + Clone
+where
+    EX: TryFrom<[u8; 349], Error = JoyConError> + Clone,
 {
     fn clone(&self) -> Self {
         let common = self.common.clone();
@@ -369,7 +374,8 @@ impl<EX> Clone for StandardInputReport<EX>
 }
 
 impl<EX> Hash for StandardInputReport<EX>
-    where EX: TryFrom<[u8; 349], Error=JoyConError> + Hash
+where
+    EX: TryFrom<[u8; 349], Error = JoyConError> + Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.common.hash(state);
@@ -378,18 +384,15 @@ impl<EX> Hash for StandardInputReport<EX>
 }
 
 impl<EX> PartialEq for StandardInputReport<EX>
-    where EX: TryFrom<[u8; 349], Error=JoyConError> + PartialEq
+where
+    EX: TryFrom<[u8; 349], Error = JoyConError> + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.common.eq(&other.common)
-            && self.extra.eq(&other.extra)
+        self.common.eq(&other.common) && self.extra.eq(&other.extra)
     }
 }
 
-impl<EX> Eq for StandardInputReport<EX>
-    where EX: TryFrom<[u8; 349], Error=JoyConError> + Eq
-{}
-
+impl<EX> Eq for StandardInputReport<EX> where EX: TryFrom<[u8; 349], Error = JoyConError> + Eq {}
 
 /// Receive standard input report with sub-command's reply.
 ///
@@ -402,9 +405,7 @@ pub mod sub_command_mode {
     /// Ack byte. If it is ACK, it contains data type.
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub enum AckByte {
-        Ack {
-            data_type: u8
-        },
+        Ack { data_type: u8 },
         Nack,
     }
 
@@ -412,7 +413,7 @@ pub mod sub_command_mode {
         fn from(u: u8) -> Self {
             if u >> 7 == 1 {
                 AckByte::Ack {
-                    data_type: u & 0x7F
+                    data_type: u & 0x7F,
                 }
             } else {
                 AckByte::Nack
@@ -467,25 +468,30 @@ pub mod sub_command_mode {
     ///     const ARGS: Self::ArgsType = [];
     /// }
     /// ```
-    pub trait SubCommandReplyData: TryFrom<[u8; 35], Error=JoyConError> {
+    pub trait SubCommandReplyData: TryFrom<[u8; 35], Error = JoyConError> {
         type ArgsType: 'static + Send + Copy + AsRef<[u8]>;
         const SUB_COMMAND: SubCommand;
         const ARGS: Self::ArgsType;
 
         /// The mode remains the same, sending commands and receiving replies.
-        fn once<D>(driver: &mut D) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<Self>>>>
-            where Self: std::marker::Sized,
-                  D: JoyConDriver
+        fn once<D>(
+            driver: &mut D,
+        ) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<Self>>>>
+        where
+            Self: std::marker::Sized,
+            D: JoyConDriver,
         {
             match driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref()) {
                 Ok(reply) => {
                     let ok = match reply {
-                        SubCommandReply::Checked(reply) => SubCommandReply::Checked(StandardInputReport::try_from(reply)?),
-                        SubCommandReply::Unchecked => SubCommandReply::Unchecked
+                        SubCommandReply::Checked(reply) => {
+                            SubCommandReply::Checked(StandardInputReport::try_from(reply)?)
+                        }
+                        SubCommandReply::Unchecked => SubCommandReply::Unchecked,
                     };
                     Ok(ok)
                 }
-                Err(e) => Err(e)
+                Err(e) => Err(e),
             }
         }
     }
@@ -493,7 +499,8 @@ pub mod sub_command_mode {
     /// Replies to sub-commands
     #[derive(Clone)]
     pub struct SubCommandReport<RD>
-        where RD: SubCommandReplyData
+    where
+        RD: SubCommandReplyData,
     {
         pub ack_byte: AckByte,
         pub sub_command_id: u8,
@@ -501,24 +508,25 @@ pub mod sub_command_mode {
     }
 
     impl<RD> Debug for SubCommandReport<RD>
-        where RD: SubCommandReplyData + Debug
+    where
+        RD: SubCommandReplyData + Debug,
     {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            write!(f,
-                   "SubCommandReport {{\
+            write!(
+                f,
+                "SubCommandReport {{\
                             \n\t ack_byte: {:?},
                             \n\t sub_command_id: {},
                             \n\t reply: {:?},
                    }}",
-                   self.ack_byte,
-                   self.sub_command_id,
-                   &self.reply
+                self.ack_byte, self.sub_command_id, &self.reply
             )
         }
     }
 
     impl<RD> TryFrom<[u8; 349]> for SubCommandReport<RD>
-        where RD: SubCommandReplyData
+    where
+        RD: SubCommandReplyData,
     {
         type Error = JoyConError;
 
@@ -587,7 +595,7 @@ pub mod standard_full_mode {
     #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone)]
     pub struct IMUData {
-        pub data: [AxisData; 3]
+        pub data: [AxisData; 3],
     }
 
     impl TryFrom<[u8; 349]> for IMUData {
@@ -613,12 +621,10 @@ pub mod standard_full_mode {
             let axis_data = [
                 AxisData::from(latest),
                 AxisData::from(a_5ms_older),
-                AxisData::from(a_10ms_older)
+                AxisData::from(a_10ms_older),
             ];
 
-            Ok(IMUData {
-                data: axis_data,
-            })
+            Ok(IMUData { data: axis_data })
         }
     }
 
@@ -669,7 +675,8 @@ pub mod standard_full_mode {
     }
 
     impl<D> InputReportMode<D> for StandardFullMode<D>
-        where D: JoyConDriver
+    where
+        D: JoyConDriver,
     {
         type Report = StandardInputReport<IMUData>;
         type ArgsType = [u8; 1];
@@ -679,12 +686,10 @@ pub mod standard_full_mode {
         fn new(driver: D) -> JoyConResult<Self> {
             let mut driver = driver;
             // enable IMU(6-Axis sensor)
-            let imf_enabled = driver.enabled_features()
-                .iter()
-                .any(|jf| match jf {
-                    JoyConFeature::IMUFeature(_) => true,
-                    _ => false,
-                });
+            let imf_enabled = driver.enabled_features().iter().any(|jf| match jf {
+                JoyConFeature::IMUFeature(_) => true,
+                _ => false,
+            });
             if !imf_enabled {
                 driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
             }
@@ -693,9 +698,7 @@ pub mod standard_full_mode {
 
             driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
-            Ok(StandardFullMode {
-                driver
-            })
+            Ok(StandardFullMode { driver })
         }
 
         fn driver(&self) -> &D {
@@ -743,11 +746,13 @@ pub mod simple_hid_mode {
 
     const BUTTON1: [SimpleHIDButton; 6] = {
         use SimpleHIDButton::*;
-        [Down, Right, Left, Up, SL, SR, ]
+        [Down, Right, Left, Up, SL, SR]
     };
     const BUTTON2: [SimpleHIDButton; 8] = {
         use SimpleHIDButton::*;
-        [Minus, Plus, LeftStick, RightStick, Home, Capture, L_R, ZL_ZR, ]
+        [
+            Minus, Plus, LeftStick, RightStick, Home, Capture, L_R, ZL_ZR,
+        ]
     };
 
     /// Hold your controller sideways so that SL, SYNC, and SR line up with the screen. Pushing the stick towards a direction in this table will cause that value to be sent.
@@ -808,22 +813,24 @@ pub mod simple_hid_mode {
                 let byte_2 = value[2];
                 [].iter()
                     .chain(
-                        BUTTON1.iter()
+                        BUTTON1
+                            .iter()
                             .enumerate()
                             .filter(|(idx, _)| {
                                 let idx = 2u8.pow(*idx as u32) as u8;
                                 byte_1 & idx == idx
                             })
-                            .map(|(_, b)| b)
+                            .map(|(_, b)| b),
                     )
                     .chain(
-                        BUTTON2.iter()
+                        BUTTON2
+                            .iter()
                             .enumerate()
                             .filter(|(idx, _)| {
                                 let idx = 2u8.pow(*idx as u32) as u8;
                                 byte_2 & idx == idx
                             })
-                            .map(|(_, b)| b)
+                            .map(|(_, b)| b),
                     )
                     .cloned()
                     .collect()
@@ -903,7 +910,8 @@ pub mod simple_hid_mode {
     }
 
     impl<D> InputReportMode<D> for SimpleHIDMode<D>
-        where D: JoyConDriver
+    where
+        D: JoyConDriver,
     {
         type Report = SimpleHIDReport;
         type ArgsType = [u8; 1];
@@ -914,9 +922,7 @@ pub mod simple_hid_mode {
             let mut driver = driver;
             driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
-            Ok(SimpleHIDMode {
-                driver
-            })
+            Ok(SimpleHIDMode { driver })
         }
 
         fn driver(&self) -> &D {

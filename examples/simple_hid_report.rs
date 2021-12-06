@@ -4,8 +4,7 @@ use joycon_rs::prelude::*;
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
 
-    let (tx, rx) =
-        std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel();
 
     let _output = std::thread::spawn(move || {
         // Push buttons or tilt the stick please.
@@ -25,21 +24,18 @@ fn main() -> JoyConResult<()> {
         }
     };
 
-    devices.iter()
-        .try_for_each::<_, JoyConResult<()>>(|d| {
-            let driver = SimpleJoyConDriver::new(&d)?;
+    devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
+        let driver = SimpleJoyConDriver::new(&d)?;
 
-            let simple_hid_mode = SimpleHIDMode::new(driver)?;
-            let tx = tx.clone();
+        let simple_hid_mode = SimpleHIDMode::new(driver)?;
+        let tx = tx.clone();
 
-            std::thread::spawn(move || {
-                loop {
-                    tx.send(simple_hid_mode.read_input_report()).unwrap();
-                }
-            });
+        std::thread::spawn(move || loop {
+            tx.send(simple_hid_mode.read_input_report()).unwrap();
+        });
 
-            Ok(())
-        })?;
+        Ok(())
+    })?;
 
     Ok(())
 }

@@ -25,20 +25,17 @@ fn main() -> JoyConResult<()> {
         }
     };
 
-    devices.iter()
-        .try_for_each::<_, JoyConResult<()>>(|d| {
-            let driver = SimpleJoyConDriver::new(&d)?;
-            let standard_full_mode = StandardFullMode::new(driver)?;
-            let tx = tx.clone();
+    devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
+        let driver = SimpleJoyConDriver::new(&d)?;
+        let standard_full_mode = StandardFullMode::new(driver)?;
+        let tx = tx.clone();
 
-            std::thread::spawn( move || {
-                loop {
-                    tx.send(standard_full_mode.read_input_report()).unwrap();
-                }
-            });
+        std::thread::spawn(move || loop {
+            tx.send(standard_full_mode.read_input_report()).unwrap();
+        });
 
-            Ok(())
-        })?;
+        Ok(())
+    })?;
 
     Ok(())
 }

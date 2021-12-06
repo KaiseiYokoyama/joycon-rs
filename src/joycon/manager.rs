@@ -1,10 +1,10 @@
 use super::*;
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, Once};
-use std::time::Duration;
-use std::thread::JoinHandle;
 use std::option::Option::Some;
+use std::sync::{Mutex, Once};
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct JoyConSerialNumber(pub String);
@@ -35,15 +35,14 @@ impl JoyConManager {
 
         unsafe {
             ONCE.call_once(|| {
-                let instance = JoyConManager::new()
-                    .unwrap();
+                let instance = JoyConManager::new().unwrap();
 
                 SINGLETON = Some(instance);
             });
 
             match SINGLETON.clone() {
                 Some(manager) => manager,
-                None => unreachable!()
+                None => unreachable!(),
             }
         }
     }
@@ -54,9 +53,8 @@ impl JoyConManager {
     }
 
     fn with_interval(interval: Duration) -> JoyConResult<Arc<Mutex<Self>>> {
-        let (tx, rx) =
-            crossbeam_channel::unbounded();
-            // crossbeam_channel::bounded(0);
+        let (tx, rx) = crossbeam_channel::unbounded();
+        // crossbeam_channel::bounded(0);
 
         let manager = {
             let mut manager = JoyConManager {
@@ -68,11 +66,9 @@ impl JoyConManager {
             };
 
             // First scan
-            manager.scan()?
-                .into_iter()
-                .for_each(|new_device| {
-                    let _ = tx.send(new_device);
-                });
+            manager.scan()?.into_iter().for_each(|new_device| {
+                let _ = tx.send(new_device);
+            });
 
             Arc::new(Mutex::new(manager))
         };
@@ -92,10 +88,12 @@ impl JoyConManager {
                         // Send new devices
                         if let Ok(new_devices) = manager.scan() {
                             // If mpsc channel is disconnected, end this thread.
-                            let send_result = new_devices.into_iter()
-                                .try_for_each::<_, Result<(), crossbeam_channel::SendError<_>>>(|new_device| {
-                                    tx.send(new_device)
-                                });
+                            let send_result = new_devices.into_iter().try_for_each::<_, Result<
+                                (),
+                                crossbeam_channel::SendError<_>,
+                            >>(
+                                |new_device| tx.send(new_device),
+                            );
                             if send_result.is_err() {
                                 return;
                             }
@@ -139,29 +137,25 @@ impl JoyConManager {
             }
         };
 
-        let previous_device_serials = self.devices.keys()
-            .cloned()
-            .collect::<HashSet<_>>();
+        let previous_device_serials = self.devices.keys().cloned().collect::<HashSet<_>>();
 
-        let detected_device_serials = hid_api.device_list()
-            .filter(|&device_info|
-                JoyConDevice::check_type_of_device(device_info)
-                    .is_ok()
-            )
-            .flat_map(|device_info|
-                device_info.serial_number()
+        let detected_device_serials = hid_api
+            .device_list()
+            .filter(|&device_info| JoyConDevice::check_type_of_device(device_info).is_ok())
+            .flat_map(|device_info| {
+                device_info
+                    .serial_number()
                     .map(|s| s.to_string())
                     .map(JoyConSerialNumber)
-            )
+            })
             .collect::<HashSet<_>>();
 
-        let mut detected_devices = hid_api.device_list()
-            .filter(|&device_info|
-                JoyConDevice::check_type_of_device(device_info)
-                    .is_ok()
-            )
+        let mut detected_devices = hid_api
+            .device_list()
+            .filter(|&device_info| JoyConDevice::check_type_of_device(device_info).is_ok())
             .flat_map(|di| {
-                let serial_number = di.serial_number()
+                let serial_number = di
+                    .serial_number()
                     .map(|s| s.to_string())
                     .map(JoyConSerialNumber)?;
                 let device = JoyConDevice::new(di, hid_api).ok()?;
@@ -177,7 +171,7 @@ impl JoyConManager {
                 if let Some(device) = self.devices.get(&key) {
                     let mut device = match device.lock() {
                         Ok(d) => d,
-                        Err(e) => e.into_inner()
+                        Err(e) => e.into_inner(),
                     };
 
                     device.forget_device();
@@ -187,37 +181,45 @@ impl JoyConManager {
 
         // reconnected
         {
-            let reconnected_keys = previous_device_serials.intersection(&detected_device_serials)
+            let reconnected_keys = previous_device_serials
+                .intersection(&detected_device_serials)
                 .filter(|&k| {
                     if let Some(device) = self.devices.get(k) {
                         !match device.lock() {
                             Ok(d) => d,
                             Err(d) => d.into_inner(),
-                        }.is_connected()
+                        }
+                        .is_connected()
                     } else {
                         unreachable!()
                     }
-                }).collect::<HashSet<_>>();
-            reconnected_keys.iter()
-                .for_each(|&k| {
-                    if let (Some(device), Some(new_device)) = (self.devices.get(k), detected_devices.remove(k)) {
-                        let mut device = match device.lock() {
-                            Ok(d) => d,
-                            Err(e) => e.into_inner()
-                        };
+                })
+                .collect::<HashSet<_>>();
+            reconnected_keys.iter().for_each(|&k| {
+                if let (Some(device), Some(new_device)) =
+                    (self.devices.get(k), detected_devices.remove(k))
+                {
+                    let mut device = match device.lock() {
+                        Ok(d) => d,
+                        Err(e) => e.into_inner(),
+                    };
 
-                        let new_device = {
-                            if let Ok(new_device) = Arc::try_unwrap(new_device) {
-                                match new_device.into_inner() {
-                                    Ok(d) => d,
-                                    Err(e) => e.into_inner()
-                                }
-                            } else { unreachable!() }
-                        };
+                    let new_device = {
+                        if let Ok(new_device) = Arc::try_unwrap(new_device) {
+                            match new_device.into_inner() {
+                                Ok(d) => d,
+                                Err(e) => e.into_inner(),
+                            }
+                        } else {
+                            unreachable!()
+                        }
+                    };
 
-                        *device = new_device;
-                    } else { unreachable!() }
-                });
+                    *device = new_device;
+                } else {
+                    unreachable!()
+                }
+            });
         }
 
         let mut new_devices = Vec::new();
@@ -240,9 +242,7 @@ impl JoyConManager {
     /// Collection of managed JoyCons.
     /// It may contains disconnected ones.
     pub fn managed_devices(&self) -> Vec<Arc<Mutex<JoyConDevice>>> {
-        self.devices.values()
-            .map(|d| Arc::clone(d))
-            .collect()
+        self.devices.values().map(|d| Arc::clone(d)).collect()
     }
 
     /// Receiver of new devices.

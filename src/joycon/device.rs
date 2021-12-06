@@ -81,8 +81,7 @@ pub mod calibration {
 
                 let left_stick_calibration = {
                     let left_stick_cal = &stick_cal[0..9];
-                    if left_stick_cal.iter().all(|u| u == &0xFF)
-                    {
+                    if left_stick_cal.iter().all(|u| u == &0xFF) {
                         StickCalibration::Unavailable
                     } else {
                         let left_stick_data = stick_cal_to_data(&stick_cal[0..9]);
@@ -104,8 +103,7 @@ pub mod calibration {
 
                 let right_stick_calibration = {
                     let right_stick_cal = &stick_cal[9..18];
-                    if right_stick_cal.iter().all(|u| u == &0xFF)
-                    {
+                    if right_stick_cal.iter().all(|u| u == &0xFF) {
                         StickCalibration::Unavailable
                     } else {
                         let right_stick_data = stick_cal_to_data(right_stick_cal);
@@ -133,13 +131,16 @@ pub mod calibration {
         }
 
         pub fn get_factory_calibration(device: &HidDevice) -> Option<JoyConSticksCalibration> {
-            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x3D, 0x60, 0, 0, 18])
+            device
+                .write(&[
+                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x3D, 0x60,
+                    0, 0, 18,
+                ])
                 .ok()?;
 
             for _ in 0..5 {
                 let mut buf = [0u8; 64];
-                device.read_timeout(&mut buf, 20)
-                    .ok()?;
+                device.read_timeout(&mut buf, 20).ok()?;
 
                 match buf[14..20] {
                     [0x10, 0x3D, 0x60, 0, 0, 18] => {}
@@ -156,13 +157,16 @@ pub mod calibration {
         }
 
         pub fn get_user_calibration(device: &HidDevice) -> Option<JoyConSticksCalibration> {
-            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x12, 0x80, 0, 0, 20])
+            device
+                .write(&[
+                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x12, 0x80,
+                    0, 0, 20,
+                ])
                 .ok()?;
 
             for _ in 0..5 {
                 let mut buf = [0u8; 64];
-                device.read_timeout(&mut buf, 20)
-                    .ok()?;
+                device.read_timeout(&mut buf, 20).ok()?;
 
                 match buf[14..20] {
                     [0x10, 0x12, 0x80, 0, 0, 20] => {}
@@ -229,13 +233,16 @@ pub mod calibration {
         }
 
         pub fn get_parameters(device: &HidDevice) -> Option<StickParameters> {
-            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x86, 0x60, 0, 0, 18])
+            device
+                .write(&[
+                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x86, 0x60,
+                    0, 0, 18,
+                ])
                 .ok()?;
 
             for _ in 0..5 {
                 let mut buf = [0u8; 64];
-                device.read_timeout(&mut buf, 20)
-                    .ok()?;
+                device.read_timeout(&mut buf, 20).ok()?;
 
                 match buf[14..20] {
                     [0x10, 0x86, 0x60, 0, 0, 18] => {}
@@ -264,7 +271,10 @@ pub mod calibration {
             pub z: T,
         }
 
-        impl<T> Clone for XYZ<T> where T: Debug + Clone {
+        impl<T> Clone for XYZ<T>
+        where
+            T: Debug + Clone,
+        {
             fn clone(&self) -> Self {
                 Self {
                     x: self.x.clone(),
@@ -274,7 +284,10 @@ pub mod calibration {
             }
         }
 
-        impl<T> Hash for XYZ<T> where T: Debug + Hash {
+        impl<T> Hash for XYZ<T>
+        where
+            T: Debug + Hash,
+        {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
                 self.x.hash(state);
                 self.y.hash(state);
@@ -282,11 +295,12 @@ pub mod calibration {
             }
         }
 
-        impl<T> PartialEq for XYZ<T> where T: Debug + PartialEq {
+        impl<T> PartialEq for XYZ<T>
+        where
+            T: Debug + PartialEq,
+        {
             fn eq(&self, other: &Self) -> bool {
-                self.x == other.x
-                    && self.y == other.y
-                    && self.z == other.z
+                self.x == other.x && self.y == other.y && self.z == other.z
             }
         }
 
@@ -309,8 +323,8 @@ pub mod calibration {
 
         impl From<[u8; 24]> for IMUCalibration {
             fn from(value: [u8; 24]) -> Self {
-                use std::slice::Iter;
                 use std::iter::Cloned;
+                use std::slice::Iter;
 
                 if value.iter().all(|v| v == &0xFF) {
                     return IMUCalibration::Unavailable;
@@ -345,13 +359,16 @@ pub mod calibration {
         }
 
         pub fn get_factory_calibration(device: &HidDevice) -> Option<IMUCalibration> {
-            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x20, 0x60, 0, 0, 24])
+            device
+                .write(&[
+                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x20, 0x60,
+                    0, 0, 24,
+                ])
                 .ok()?;
 
             for _ in 0..5 {
                 let mut buf = [0u8; 64];
-                device.read_timeout(&mut buf, 20)
-                    .ok()?;
+                device.read_timeout(&mut buf, 20).ok()?;
 
                 match buf[14..20] {
                     [0x10, 0x20, 0x60, 0, 0, 24] => {}
@@ -368,13 +385,16 @@ pub mod calibration {
         }
 
         pub fn get_user_calibration(device: &HidDevice) -> Option<IMUCalibration> {
-            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x28, 0x80, 0, 0, 24])
+            device
+                .write(&[
+                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x28, 0x80,
+                    0, 0, 24,
+                ])
                 .ok()?;
 
             for _ in 0..5 {
                 let mut buf = [0u8; 64];
-                device.read_timeout(&mut buf, 20)
-                    .ok()?;
+                device.read_timeout(&mut buf, 20).ok()?;
 
                 match buf[14..20] {
                     [0x10, 0x28, 0x80, 0, 0, 24] => {}
@@ -403,22 +423,21 @@ pub mod calibration {
                 let y = i16::from_le_bytes([array[2], array[3]]);
                 let z = i16::from_le_bytes([array[4], array[5]]);
 
-                IMUOffsets {
-                    x,
-                    y,
-                    z,
-                }
+                IMUOffsets { x, y, z }
             }
         }
 
         pub fn get_offsets(device: &HidDevice) -> Option<IMUOffsets> {
-            device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x80, 0x60, 0, 0, 6])
+            device
+                .write(&[
+                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x80, 0x60,
+                    0, 0, 6,
+                ])
                 .ok()?;
 
             for _ in 0..5 {
                 let mut buf = [0u8; 64];
-                device.read_timeout(&mut buf, 20)
-                    .ok()?;
+                device.read_timeout(&mut buf, 20).ok()?;
 
                 match buf[14..20] {
                     [0x10, 0x80, 0x60, 0, 0, 6] => {}
@@ -473,13 +492,16 @@ pub mod color {
     }
 
     pub fn get_color(device: &HidDevice) -> Option<Color> {
-        device.write(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x50, 0x60, 0, 0, 12])
+        device
+            .write(&[
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x50, 0x60, 0, 0,
+                12,
+            ])
             .ok()?;
 
         for _ in 0..5 {
             let mut buf = [0u8; 64];
-            device.read_timeout(&mut buf, 20)
-                .ok()?;
+            device.read_timeout(&mut buf, 20).ok()?;
 
             match buf[14..20] {
                 [0x10, 0x50, 0x60, 0, 0, 12] => {}
@@ -495,7 +517,6 @@ pub mod color {
         None
     }
 }
-
 
 pub struct JoyConDevice {
     hid_device: Option<HidDevice>,
@@ -561,7 +582,9 @@ impl JoyConDevice {
         &self.imu_user_calibration
     }
 
-    pub fn color(&self) -> &color::Color { &self.color }
+    pub fn color(&self) -> &color::Color {
+        &self.color
+    }
 
     /// Set blocking mode.
     ///
@@ -592,9 +615,8 @@ impl JoyConDevice {
         let device_type = Self::check_type_of_device(device_info)?;
 
         let serial = device_info.serial_number().unwrap_or("");
-        let hid_device = hidapi.open_serial(device_info.vendor_id(),
-                                            device_info.product_id(),
-                                            serial)?;
+        let hid_device =
+            hidapi.open_serial(device_info.vendor_id(), device_info.product_id(), serial)?;
         let stick_parameters = calibration::stick::get_parameters(&hid_device)
             .ok_or(JoyConDeviceError::FailedStickParameterLoading)?;
         let stick_factory_calibration = calibration::stick::get_factory_calibration(&hid_device)
@@ -607,23 +629,20 @@ impl JoyConDevice {
             .ok_or(JoyConDeviceError::FailedIMUCalibrationLoading)?;
         let imu_user_calibration = calibration::imu::get_user_calibration(&hid_device)
             .ok_or(JoyConDeviceError::FailedIMUCalibrationLoading)?;
-        let color = color::get_color(&hid_device)
-            .ok_or(JoyConDeviceError::FailedColorLoading)?;
+        let color = color::get_color(&hid_device).ok_or(JoyConDeviceError::FailedColorLoading)?;
 
-        Ok(
-            JoyConDevice {
-                hid_device: Some(hid_device),
-                serial_number: serial.to_string(),
-                device_type,
-                stick_parameters,
-                stick_factory_calibration,
-                stick_user_calibration,
-                imu_offsets,
-                imu_factory_calibration,
-                imu_user_calibration,
-                color,
-            }
-        )
+        Ok(JoyConDevice {
+            hid_device: Some(hid_device),
+            serial_number: serial.to_string(),
+            device_type,
+            stick_parameters,
+            stick_factory_calibration,
+            stick_user_calibration,
+            imu_offsets,
+            imu_factory_calibration,
+            imu_user_calibration,
+            color,
+        })
     }
 
     pub fn write(&self, data: &[u8]) -> JoyConResult<usize> {
@@ -687,7 +706,6 @@ impl<'a> TryInto<&'a HidDevice> for &'a JoyConDevice {
     type Error = JoyConError;
 
     fn try_into(self) -> Result<&'a HidDevice, Self::Error> {
-        self.hid_device.as_ref()
-            .ok_or(JoyConError::Disconnected)
+        self.hid_device.as_ref().ok_or(JoyConError::Disconnected)
     }
 }

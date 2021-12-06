@@ -1,12 +1,11 @@
 #![allow(unused_must_use)]
 
-use joycon_rs::prelude::*;
-use joycon_rs::joycon::{JoyConManager, SimpleJoyConDriver};
 use joycon_rs::joycon::lights::*;
+use joycon_rs::joycon::{JoyConManager, SimpleJoyConDriver};
+use joycon_rs::prelude::*;
 
 fn main() -> JoyConResult<()> {
-    let (tx, rx) =
-        std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel();
 
     let _output = std::thread::spawn(move || {
         // Push buttons or tilt the stick please.
@@ -21,23 +20,24 @@ fn main() -> JoyConResult<()> {
         let lock = manager.lock();
         match lock {
             Ok(m) => m.new_devices(),
-            Err(_) => unreachable!()
+            Err(_) => unreachable!(),
         }
     };
 
-    devices.iter()
-        .try_for_each::<_, JoyConResult<()>>(|d| {
-            let mut driver = SimpleJoyConDriver::new(&d)?;
-            let tx = tx.clone();
+    devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
+        let mut driver = SimpleJoyConDriver::new(&d)?;
+        let tx = tx.clone();
 
-            std::thread::spawn(move || {
-                driver.set_player_lights(&[], &[]).unwrap();
-                driver.set_player_lights(&[LightUp::LED1], &[Flash::LED1]).unwrap();
-                tx.send(driver.get_player_lights()).unwrap();
-            });
+        std::thread::spawn(move || {
+            driver.set_player_lights(&[], &[]).unwrap();
+            driver
+                .set_player_lights(&[LightUp::LED1], &[Flash::LED1])
+                .unwrap();
+            tx.send(driver.get_player_lights()).unwrap();
+        });
 
-            Ok(())
-        })?;
+        Ok(())
+    })?;
 
     Ok(())
 }

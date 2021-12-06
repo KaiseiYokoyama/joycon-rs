@@ -90,7 +90,7 @@ pub mod imu_sensitivity {
                 gyroscope_sensitivity as u8,
                 accelerometer_sensitivity as u8,
                 gyroscope_performance_rate as u8,
-                accelerometer_anti_aliasing_filter_bandwidth as u8
+                accelerometer_anti_aliasing_filter_bandwidth as u8,
             ]
         }
     }

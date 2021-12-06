@@ -48,7 +48,7 @@ impl Rumble {
     }
 
     /// Constructor of Rumble.
-/// If arguments not in line with constraints, args will be saturated.
+    /// If arguments not in line with constraints, args will be saturated.
     pub fn new(freq: f32, amp: f32) -> Self {
         let freq = if freq < 0.0 {
             0.0
@@ -78,14 +78,14 @@ impl Rumble {
     }
 
     /// Generates stopper of rumbling.
-///
-/// # Example
-/// ```ignore
-/// # use joycon_rs::prelude::*;
-/// # let mut rumbling_controller_driver: SimpleJoyConDriver;
-/// // Make JoyCon stop rambling.
-/// rumbling_controller_driver.rumble((Some(Rumble::stop()),Some(Rumble::stop()))).unwrap();
-/// ```
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use joycon_rs::prelude::*;
+    /// # let mut rumbling_controller_driver: SimpleJoyConDriver;
+    /// // Make JoyCon stop rambling.
+    /// rumbling_controller_driver.rumble((Some(Rumble::stop()),Some(Rumble::stop()))).unwrap();
+    /// ```
     pub fn stop() -> Self {
         Self {
             frequency: 0.0,
@@ -106,21 +106,26 @@ impl Into<[u8; 4]> for Rumble {
         } else if self.amplitude > 0.12 {
             f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
         } else {
-            f32::round(((f32::log2(self.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * self.amplitude)) as u8
+            f32::round(((f32::log2(self.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * self.amplitude))
+                as u8
         };
 
         let hf_amp: u16 = {
             let hf_amp: u16 = encoded_hex_amp as u16 * 2;
             if hf_amp > 0x01FC {
                 0x01FC
-            } else { hf_amp }
+            } else {
+                hf_amp
+            }
         }; // encoded_hex_amp<<1;
         let lf_amp: u8 = {
             let lf_amp = encoded_hex_amp / 2 + 64;
             if lf_amp > 0x7F {
                 0x7F
-            } else { lf_amp }
-        };      // (encoded_hex_amp>>1)+0x40;
+            } else {
+                lf_amp
+            }
+        }; // (encoded_hex_amp>>1)+0x40;
 
         let mut buf = [0u8; 4];
 

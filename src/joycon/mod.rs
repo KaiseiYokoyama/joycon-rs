@@ -2,23 +2,15 @@ use crate::prelude::*;
 
 pub use device::{JoyConDevice, JoyConDeviceType};
 pub use driver::{
-    Rotation,
-    Rumble,
-    joycon_features,
-    SubCommandReply,
-    JoyConDriver,
-    GlobalPacketNumber,
-    SimpleJoyConDriver,
-    Command,
-    SubCommand,
-    input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode},
-    lights,
     device_info,
+    input_report_mode::{self, InputReportMode, SimpleHIDMode, StandardFullMode},
+    joycon_features, lights, Command, GlobalPacketNumber, JoyConDriver, Rotation, Rumble,
+    SimpleJoyConDriver, SubCommand, SubCommandReply,
 };
 pub use manager::{JoyConManager, JOYCON_RECEIVER};
 
-use std::sync::Arc;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
