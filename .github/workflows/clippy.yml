@@ -19,6 +19,10 @@ jobs:
             toolchain: nightly
             components: clippy
             override: true
+      - name: Setup with apt
+        run: |
+          sudo apt-get update
+          sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
       # https://github.com/actions-rs/clippy-check/issues/2#issuecomment-807878478
       - name: Check workflow permissions
         id: check_permissions
