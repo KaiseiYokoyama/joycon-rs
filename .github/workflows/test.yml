@@ -1,4 +1,4 @@
-name: Test on ubuntu
+name: Test
 
 on:
   push:
@@ -7,9 +7,13 @@ on:
     branches: [ master, dev/* ]
 
 jobs:
-  test-on-ububtu:
+  test:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
     - name: Cache cargo registry
@@ -28,10 +32,11 @@ jobs:
         path: target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     - uses: actions/checkout@v2
-    - name: Apt get update
-      run: sudo apt-get update
-    - name: Setup
-      run: sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
+    - name: Setup with apt
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
