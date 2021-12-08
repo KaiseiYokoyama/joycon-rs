@@ -80,6 +80,7 @@ mod global_packet_number {
         }
     }
 
+    #[allow(clippy::derivable_impls)]
     impl Default for GlobalPacketNumber {
         fn default() -> Self {
             GlobalPacketNumber(0x0)
