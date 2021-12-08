@@ -106,8 +106,7 @@ impl From<Rumble> for [u8; 4] {
         } else if s.amplitude > 0.12 {
             f32::round(f32::log2(s.amplitude * 17.0) * 16.0) as u8
         } else {
-            f32::round(((f32::log2(s.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * s.amplitude))
-                as u8
+            f32::round(((f32::log2(s.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * s.amplitude)) as u8
         };
 
         let hf_amp: u16 = {
