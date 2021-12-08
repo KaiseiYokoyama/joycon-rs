@@ -121,9 +121,9 @@ pub mod home_button {
         }
     }
 
-    impl Into<u8> for u4 {
-        fn into(self) -> u8 {
-            self.0
+    impl From<u4> for u8 {
+        fn from(s: u4) -> u8 {
+            s.0
         }
     }
 
@@ -269,8 +269,8 @@ pub mod home_button {
         }
     }
 
-    impl Into<[u8; 25]> for LightEmittingPattern {
-        fn into(self) -> [u8; 25] {
+    impl From<LightEmittingPattern> for [u8; 25] {
+        fn from(s: LightEmittingPattern) -> [u8; 25] {
             fn nibbles_to_u8(high: u4, low: u4) -> u8 {
                 let high = {
                     let high: u8 = high.into();
@@ -286,23 +286,23 @@ pub mod home_button {
 
             let mut buf = [0u8; 25];
 
-            let number_of_phases = if let Some(p) = self.phases_len {
+            let number_of_phases = if let Some(p) = s.phases_len {
                 p
             } else {
-                (self.phases.len() as u8).into()
+                (s.phases.len() as u8).into()
             };
-            buf[0] = nibbles_to_u8(number_of_phases, self.global_mini_cycle_duration);
+            buf[0] = nibbles_to_u8(number_of_phases, s.global_mini_cycle_duration);
 
-            buf[1] = nibbles_to_u8(self.led_start_intensity, self.repeat_count);
+            buf[1] = nibbles_to_u8(s.led_start_intensity, s.repeat_count);
 
-            let mut even_phases = self
+            let mut even_phases = s
                 .phases
                 .iter()
                 .take(15)
                 .enumerate()
                 .filter(|(idx, _)| idx % 2 == 0)
                 .map(|e| e.1);
-            let mut odd_phases = self
+            let mut odd_phases = s
                 .phases
                 .iter()
                 .take(15)

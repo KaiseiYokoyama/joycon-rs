@@ -63,10 +63,7 @@ impl SimpleJoyConDriver {
                     Err(e) => e.into_inner(),
                 }
                 .device_type();
-                match device {
-                    JoyConDeviceType::ProCon => false,
-                    _ => true,
-                }
+                !matches!(device, JoyConDeviceType::ProCon)
             },
             global_packet_number: GlobalPacketNumber::default(),
         };
@@ -76,10 +73,7 @@ impl SimpleJoyConDriver {
                 Ok(d) => d,
                 Err(e) => e.into_inner(),
             };
-            match device.device_type() {
-                JoyConDeviceType::ProCon => false,
-                _ => true,
-            }
+            !matches!(device.device_type(), JoyConDeviceType::ProCon)
         };
 
         if check_reply {

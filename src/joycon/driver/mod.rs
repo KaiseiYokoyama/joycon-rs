@@ -97,9 +97,9 @@ mod global_packet_number {
         }
     }
 
-    impl Into<u8> for GlobalPacketNumber {
-        fn into(self) -> u8 {
-            self.0
+    impl From<GlobalPacketNumber> for u8 {
+        fn from(s: GlobalPacketNumber) -> u8 {
+            s.0
         }
     }
 }

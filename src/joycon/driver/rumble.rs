@@ -94,19 +94,19 @@ impl Rumble {
     }
 }
 
-impl Into<[u8; 4]> for Rumble {
-    fn into(self) -> [u8; 4] {
-        let encoded_hex_freq = f32::round(f32::log2(self.frequency / 10.0) * 32.0) as u8;
+impl From<Rumble> for [u8; 4] {
+    fn from(s: Rumble) -> [u8; 4] {
+        let encoded_hex_freq = f32::round(f32::log2(s.frequency / 10.0) * 32.0) as u8;
 
         let hf_freq: u16 = (encoded_hex_freq as u16).saturating_sub(0x60) * 4;
         let lf_freq: u8 = encoded_hex_freq.saturating_sub(0x41) + 1;
 
-        let encoded_hex_amp = if self.amplitude > 0.23 {
-            f32::round(f32::log2(self.amplitude * 8.7) * 32.0) as u8
-        } else if self.amplitude > 0.12 {
-            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+        let encoded_hex_amp = if s.amplitude > 0.23 {
+            f32::round(f32::log2(s.amplitude * 8.7) * 32.0) as u8
+        } else if s.amplitude > 0.12 {
+            f32::round(f32::log2(s.amplitude * 17.0) * 16.0) as u8
         } else {
-            f32::round(((f32::log2(self.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * self.amplitude))
+            f32::round(((f32::log2(s.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * s.amplitude))
                 as u8
         };
 
