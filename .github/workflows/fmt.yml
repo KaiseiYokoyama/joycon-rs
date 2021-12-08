@@ -1,4 +1,4 @@
-name: Check coding format
+name: Format
 
 on:
   push:
