@@ -263,11 +263,3 @@ pub mod result {
 
     pub type JoyConResult<T> = Result<T, JoyConError>;
 }
-
-// #[cfg(test)]
-// mod tests {
-//     #[test]
-//     fn it_works() {
-//         assert_eq!(2 + 2, 4);
-//     }
-// }
