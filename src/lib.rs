@@ -1,5 +1,9 @@
-#![doc(html_favicon_url = "https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/favicon.ico")]
-#![doc(html_logo_url = "https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/logo.png")]
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/favicon.ico"
+)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/KaiseiYokoyama/joycon-rs/master/images/logo.png"
+)]
 //! # Joycon-rs Library Documentation
 //!
 //! Hello, and welcome to joycon-rs documentation.
@@ -158,12 +162,12 @@ extern crate doc_comment;
 doctest!("../README.md");
 
 pub mod prelude {
-    #[cfg(feature = "use_serde")]
-    pub(crate) use serde::{Serialize, Deserialize};
-    pub use hidapi::*;
-    pub use crossbeam_channel;
-    pub use crate::result::*;
     pub use crate::joycon::*;
+    pub use crate::result::*;
+    pub use crossbeam_channel;
+    pub use hidapi::*;
+    #[cfg(feature = "use_serde")]
+    pub(crate) use serde::{Deserialize, Serialize};
 }
 
 pub mod result {
@@ -258,12 +262,4 @@ pub mod result {
     }
 
     pub type JoyConResult<T> = Result<T, JoyConError>;
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

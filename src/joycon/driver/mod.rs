@@ -1,12 +1,12 @@
 use super::*;
-use std::convert::TryFrom;
-use std::collections::HashSet;
-pub use rumble::Rumble;
 pub use global_packet_number::GlobalPacketNumber;
-pub use joycon_features::{JoyConFeature, IMUConfig};
+pub use joycon_features::{IMUConfig, JoyConFeature};
+pub use rumble::Rumble;
 pub use simple_joycon_driver::SimpleJoyConDriver;
-use std::sync::{Mutex, MutexGuard};
+use std::collections::HashSet;
+use std::convert::TryFrom;
 use std::hash::Hash;
+use std::sync::{Mutex, MutexGuard};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Rotation {
@@ -80,6 +80,7 @@ mod global_packet_number {
         }
     }
 
+    #[allow(clippy::derivable_impls)]
     impl Default for GlobalPacketNumber {
         fn default() -> Self {
             GlobalPacketNumber(0x0)
@@ -90,17 +91,16 @@ mod global_packet_number {
         type Output = Self;
 
         fn add(self, rhs: Self) -> Self::Output {
-            let (GlobalPacketNumber(raw), GlobalPacketNumber(raw_rhs))
-                = (self, rhs);
+            let (GlobalPacketNumber(raw), GlobalPacketNumber(raw_rhs)) = (self, rhs);
             let res = raw.wrapping_add(raw_rhs);
 
             GlobalPacketNumber(res)
         }
     }
 
-    impl Into<u8> for GlobalPacketNumber {
-        fn into(self) -> u8 {
-            self.0
+    impl From<GlobalPacketNumber> for u8 {
+        fn from(s: GlobalPacketNumber) -> u8 {
+            s.0
         }
     }
 }
@@ -112,7 +112,10 @@ pub enum SubCommandReply<T> {
     Unchecked,
 }
 
-impl<T> Clone for SubCommandReply<T> where T: Clone {
+impl<T> Clone for SubCommandReply<T>
+where
+    T: Clone,
+{
     fn clone(&self) -> Self {
         match &self {
             SubCommandReply::Checked(t) => SubCommandReply::Checked(t.clone()),
@@ -123,7 +126,10 @@ impl<T> Clone for SubCommandReply<T> where T: Clone {
 
 impl<T> Copy for SubCommandReply<T> where T: Copy {}
 
-impl<T> Debug for SubCommandReply<T> where T: Debug {
+impl<T> Debug for SubCommandReply<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             SubCommandReply::Checked(t) => write!(f, "SubCommandReply::Checked({:?})", t),
@@ -174,7 +180,12 @@ pub trait JoyConDriver {
 
     /// Send command, sub-command, and data (sub-command's arguments) with u8 integers
     /// This returns ACK packet for the command or Error.
-    fn send_command_raw(&mut self, command: u8, sub_command: u8, data: &[u8]) -> JoyConResult<usize> {
+    fn send_command_raw(
+        &mut self,
+        command: u8,
+        sub_command: u8,
+        data: &[u8],
+    ) -> JoyConResult<usize> {
         let mut buf = [0x0; 0x40];
         // set command
         buf[0] = command;
@@ -209,7 +220,11 @@ pub trait JoyConDriver {
     /// # Notice
     /// If you are using non-blocking mode,
     /// it is more likely to fail to validate the sub command reply.
-    fn send_sub_command_raw(&mut self, sub_command: u8, data: &[u8]) -> JoyConResult<SubCommandReply<[u8;362]>> {
+    fn send_sub_command_raw(
+        &mut self,
+        sub_command: u8,
+        data: &[u8],
+    ) -> JoyConResult<SubCommandReply<[u8; 362]>> {
         use input_report_mode::sub_command_mode::AckByte;
 
         self.send_command_raw(1, sub_command, data)?;
@@ -225,7 +240,7 @@ pub trait JoyConDriver {
 
                     match ack_byte {
                         AckByte::Ack { .. } => Some(buf),
-                        AckByte::Nack => None
+                        AckByte::Nack => None,
                     }
                 })
                 .next()
@@ -242,7 +257,12 @@ pub trait JoyConDriver {
     /// # Notice
     /// If you are using non-blocking mode,
     /// it is more likely to fail to validate the sub command reply.
-    fn send_command(&mut self, command: Command, sub_command: SubCommand, data: &[u8]) -> JoyConResult<usize> {
+    fn send_command(
+        &mut self,
+        command: Command,
+        sub_command: SubCommand,
+        data: &[u8],
+    ) -> JoyConResult<usize> {
         let command = command as u8;
         let sub_command = sub_command as u8;
 
@@ -251,7 +271,11 @@ pub trait JoyConDriver {
 
     /// Send sub-command, and data (sub-command's arguments) with `Command` and `SubCommand`
     /// This returns ACK packet for the command or Error.
-    fn send_sub_command(&mut self, sub_command: SubCommand, data: &[u8]) -> JoyConResult<SubCommandReply<[u8;362]>> {
+    fn send_sub_command(
+        &mut self,
+        sub_command: SubCommand,
+        data: &[u8],
+    ) -> JoyConResult<SubCommandReply<[u8; 362]>> {
         self.send_sub_command_raw(sub_command as u8, data)
     }
 
@@ -280,7 +304,7 @@ pub mod input_report_mode;
 pub mod lights;
 
 pub mod device_info {
-    use super::{*, input_report_mode::sub_command_mode::*};
+    use super::{input_report_mode::sub_command_mode::*, *};
 
     impl TryFrom<u8> for JoyConDeviceType {
         type Error = ();
@@ -290,7 +314,7 @@ pub mod device_info {
                 0 => JoyConDeviceType::JoyConL,
                 1 => JoyConDeviceType::JoyConR,
                 2 => JoyConDeviceType::ProCon,
-                _ => return Err(())
+                _ => return Err(()),
             };
 
             Ok(kind)
@@ -313,10 +337,9 @@ pub mod device_info {
 
         fn try_from(value: [u8; 35]) -> Result<Self, Self::Error> {
             let firmware_version = u16::from_be_bytes([value[0], value[1]]);
-            let device_kind = JoyConDeviceType::try_from(value[2])
-                .map_err(|()| {
-                    JoyConError::SubCommandError(SubCommand::RequestDeviceInfo as u8, value.to_vec())
-                })?;
+            let device_kind = JoyConDeviceType::try_from(value[2]).map_err(|()| {
+                JoyConError::SubCommandError(SubCommand::RequestDeviceInfo as u8, value.to_vec())
+            })?;
             let mac_address = {
                 let mut buf = [0u8; 6];
                 buf.copy_from_slice(&value[4..10]);

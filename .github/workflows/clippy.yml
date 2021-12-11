@@ -1,0 +1,42 @@
+name: Clippy
+
+on:
+  push:
+    branches: [ master, dev/* ]
+  pull_request:
+    branches: [ master, dev/* ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: clippy
+            override: true
+      - name: Setup with apt
+        run: |
+          sudo apt-get update
+          sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
+      # https://github.com/actions-rs/clippy-check/issues/2#issuecomment-807878478
+      - name: Check workflow permissions
+        id: check_permissions
+        uses: scherermichael-oss/action-has-permission@1.0.6
+        with:
+          required-permission: write
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run clippy action to produce annotations
+        uses: actions-rs/clippy-check@v1
+        if: steps.check_permissions.outputs.has-permission
+        with:
+          args: --all-targets --all-features -- -D warnings
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run clippy manually without annotations
+        if: ${{ !steps.check_permissions.outputs.has-permission }}
+        run: cargo clippy --all-targets --all-features -- -D warnings

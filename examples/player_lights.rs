@@ -1,14 +1,13 @@
 #![allow(unused_must_use)]
 
-use joycon_rs::prelude::{*, lights::*};
+use joycon_rs::prelude::{lights::*, *};
 use std::convert::TryInto;
 use std::ops::Deref;
 
 fn main() -> JoyConResult<()> {
     // First, connect your Joy-Cons to your computer!
 
-    let manager =
-        JoyConManager::get_instance();
+    let manager = JoyConManager::get_instance();
     let devices = {
         let lock = manager.lock();
         match lock {
@@ -17,7 +16,8 @@ fn main() -> JoyConResult<()> {
         }
     };
 
-    devices.iter()
+    devices
+        .iter()
         .inspect(|d| {
             let lock = d.lock();
             let device = match lock {

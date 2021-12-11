@@ -77,20 +77,20 @@ pub mod imu_sensitivity {
         pub accelerometer_anti_aliasing_filter_bandwidth: AccelerometerAntiAliasingFilterBandwidth,
     }
 
-    impl Into<[u8; 4]> for IMUConfig {
-        fn into(self) -> [u8; 4] {
+    impl From<IMUConfig> for [u8; 4] {
+        fn from(s: IMUConfig) -> [u8; 4] {
             let IMUConfig {
                 gyroscope_sensitivity,
                 accelerometer_sensitivity,
                 gyroscope_performance_rate,
                 accelerometer_anti_aliasing_filter_bandwidth,
-            } = self;
+            } = s;
 
             [
                 gyroscope_sensitivity as u8,
                 accelerometer_sensitivity as u8,
                 gyroscope_performance_rate as u8,
-                accelerometer_anti_aliasing_filter_bandwidth as u8
+                accelerometer_anti_aliasing_filter_bandwidth as u8,
             ]
         }
     }

@@ -25,7 +25,7 @@
 //! };
 //! ```
 
-use super::{*, input_report_mode::sub_command_mode::*};
+use super::{input_report_mode::sub_command_mode::*, *};
 use crate::joycon::driver::input_report_mode::StandardInputReport;
 
 /// LED to keep on lightning up / lightning
@@ -61,10 +61,8 @@ pub struct LightsStatus {
     pub flash: Vec<Flash>,
 }
 
-const LIGHT_UP: [LightUp; 4] =
-    [LightUp::LED0, LightUp::LED1, LightUp::LED2, LightUp::LED3];
-const FLASH: [Flash; 4] =
-    [Flash::LED0, Flash::LED1, Flash::LED2, Flash::LED3];
+const LIGHT_UP: [LightUp; 4] = [LightUp::LED0, LightUp::LED1, LightUp::LED2, LightUp::LED3];
+const FLASH: [Flash; 4] = [Flash::LED0, Flash::LED1, Flash::LED2, Flash::LED3];
 
 impl TryFrom<[u8; 35]> for LightsStatus {
     type Error = JoyConError;
@@ -73,14 +71,16 @@ impl TryFrom<[u8; 35]> for LightsStatus {
         let value = value[0];
 
         // parse reply
-        let light_up = LIGHT_UP.iter()
+        let light_up = LIGHT_UP
+            .iter()
             .filter(|&&l| {
                 let light = l as u8;
                 value & light == light
             })
             .cloned()
             .collect();
-        let flash = FLASH.iter()
+        let flash = FLASH
+            .iter()
             .filter(|&&f| {
                 let flash = f as u8;
                 value & flash == flash
@@ -115,13 +115,15 @@ pub mod home_button {
 
             if value > Self::MAX {
                 Self::MAX
-            } else { value }
+            } else {
+                value
+            }
         }
     }
 
-    impl Into<u8> for u4 {
-        fn into(self) -> u8 {
-            self.0
+    impl From<u4> for u8 {
+        fn from(s: u4) -> u8 {
+            s.0
         }
     }
 
@@ -159,7 +161,11 @@ pub mod home_button {
         /// * global_mini_cycle_duration (*ms*) - 0 <= global_mini_cycle_duration <= 175
         /// * led_start_intensity (*%*) - 0 <= led_start_intensity <= 100
         /// * repeat_count - 0 <= repeat_count <= 15: Value `0` is repeat forever.
-        pub fn new(global_mini_cycle_duration: u8, led_start_intensity: u8, repeat_count: u4) -> Self {
+        pub fn new(
+            global_mini_cycle_duration: u8,
+            led_start_intensity: u8,
+            repeat_count: u4,
+        ) -> Self {
             let global_mini_cycle_duration = if global_mini_cycle_duration == 0 {
                 0.into()
             } else {
@@ -167,7 +173,11 @@ pub mod home_button {
             };
 
             let led_start_intensity = {
-                let saturated = if 100 < led_start_intensity { 100 } else { led_start_intensity } as f32;
+                let saturated = if 100 < led_start_intensity {
+                    100
+                } else {
+                    led_start_intensity
+                } as f32;
                 ((saturated / 6.25) as u8).into()
             };
 
@@ -201,19 +211,30 @@ pub mod home_button {
         /// * led_intensity (*%*) - 0 <= led_intensity <= 100
         /// * fading_transition_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration (ms) * 15
         /// * led_duration (*ms*) - 0 < fading_transition_duration < self.global_mini_cycle_duration (ms) * 15
-        pub fn add_phase(mut self, led_intensity: u8, fading_transition_duration: u16, led_duration: u16) -> Self {
+        pub fn add_phase(
+            mut self,
+            led_intensity: u8,
+            fading_transition_duration: u16,
+            led_duration: u16,
+        ) -> Self {
             let led_intensity = {
-                let saturated = if 100 < led_intensity { 100 } else { led_intensity } as f32;
+                let saturated = if 100 < led_intensity {
+                    100
+                } else {
+                    led_intensity
+                } as f32;
                 ((saturated / 6.25) as u8).into()
             };
             let fading_transition_duration: u4 = {
                 let gmcd: u8 = self.global_mini_cycle_duration.into();
                 (fading_transition_duration / gmcd as u16) as u8
-            }.into();
+            }
+            .into();
             let led_duration = {
                 let gmcd: u8 = self.global_mini_cycle_duration.into();
                 (led_duration / gmcd as u16) as u8
-            }.into();
+            }
+            .into();
 
             let phase = LightEmittingPhase {
                 led_intensity,
@@ -230,17 +251,26 @@ pub mod home_button {
         ///
         /// For more information about the arguments,
         /// see the [new](#method.new) and [add_phase](#method.add_phase).
-        pub fn once(global_mini_cycle_duration: u8, led_start_intensity: u8,
-                    led_intensity: u8, fading_transition_duration: u16, led_duration: u16) -> Self {
-            let mut pattern = LightEmittingPattern::new(global_mini_cycle_duration, led_start_intensity, 0u8.into());
+        pub fn once(
+            global_mini_cycle_duration: u8,
+            led_start_intensity: u8,
+            led_intensity: u8,
+            fading_transition_duration: u16,
+            led_duration: u16,
+        ) -> Self {
+            let mut pattern = LightEmittingPattern::new(
+                global_mini_cycle_duration,
+                led_start_intensity,
+                0u8.into(),
+            );
             pattern.phases_len = Some(0u8.into());
 
             pattern.add_phase(led_intensity, fading_transition_duration, led_duration)
         }
     }
 
-    impl Into<[u8; 25]> for LightEmittingPattern {
-        fn into(self) -> [u8; 25] {
+    impl From<LightEmittingPattern> for [u8; 25] {
+        fn from(s: LightEmittingPattern) -> [u8; 25] {
             fn nibbles_to_u8(high: u4, low: u4) -> u8 {
                 let high = {
                     let high: u8 = high.into();
@@ -256,34 +286,37 @@ pub mod home_button {
 
             let mut buf = [0u8; 25];
 
-            let number_of_phases =
-                if let Some(p) = self.phases_len {
-                    p
-                } else {
-                    (self.phases.len() as u8).into()
-                };
-            buf[0] = nibbles_to_u8(number_of_phases, self.global_mini_cycle_duration);
+            let number_of_phases = if let Some(p) = s.phases_len {
+                p
+            } else {
+                (s.phases.len() as u8).into()
+            };
+            buf[0] = nibbles_to_u8(number_of_phases, s.global_mini_cycle_duration);
 
-            buf[1] = nibbles_to_u8(self.led_start_intensity, self.repeat_count);
+            buf[1] = nibbles_to_u8(s.led_start_intensity, s.repeat_count);
 
-            let mut even_phases = self.phases.iter()
+            let mut even_phases = s
+                .phases
+                .iter()
                 .take(15)
                 .enumerate()
                 .filter(|(idx, _)| idx % 2 == 0)
                 .map(|e| e.1);
-            let mut odd_phases = self.phases.iter()
+            let mut odd_phases = s
+                .phases
+                .iter()
                 .take(15)
                 .enumerate()
                 .filter(|(idx, _)| idx % 2 == 1)
                 .map(|e| e.1);
-
 
             let mut buf_index = 2;
             while let (Some(even), odd) = (even_phases.next(), odd_phases.next()) {
                 // LED intensities
                 {
                     let even_led_intensity = even.led_intensity;
-                    let odd_led_intensity = odd.map(|odd| odd.led_intensity)
+                    let odd_led_intensity = odd
+                        .map(|odd| odd.led_intensity)
                         .unwrap_or_else(|| 0u8.into());
 
                     buf[buf_index] = nibbles_to_u8(even_led_intensity, odd_led_intensity);
@@ -380,13 +413,13 @@ pub trait Lights: JoyConDriver {
     /// Player lights will be...
     /// > [SL Button] 🤔💡🤔🤔 [SR Button]
     ///
-    fn set_player_lights(&mut self, light_up: &[LightUp], flash: &[Flash]) -> JoyConResult<SubCommandReply<[u8; 362]>> {
-        let arg = light_up.iter()
-            .map(|&lu| lu as u8)
-            .sum::<u8>()
-            + flash.iter()
-            .map(|&f| f as u8)
-            .sum::<u8>();
+    fn set_player_lights(
+        &mut self,
+        light_up: &[LightUp],
+        flash: &[Flash],
+    ) -> JoyConResult<SubCommandReply<[u8; 362]>> {
+        let arg = light_up.iter().map(|&lu| lu as u8).sum::<u8>()
+            + flash.iter().map(|&f| f as u8).sum::<u8>();
 
         let reply = self.send_sub_command(SubCommand::SetPlayerLights, &[arg])?;
         Ok(reply)
@@ -413,8 +446,11 @@ pub trait Lights: JoyConDriver {
     /// };
     /// ```
     ///
-    fn get_player_lights(&mut self) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<LightsStatus>>>>
-        where Self: std::marker::Sized
+    fn get_player_lights(
+        &mut self,
+    ) -> JoyConResult<SubCommandReply<StandardInputReport<SubCommandReport<LightsStatus>>>>
+    where
+        Self: std::marker::Sized,
     {
         LightsStatus::once(self)
     }
@@ -442,7 +478,10 @@ pub trait Lights: JoyConDriver {
     ///         .add_phase(0,500,0);
     /// let player_lights_status = joycon_driver.set_home_light(&pattern);
     /// ```
-    fn set_home_light(&mut self, pattern: &home_button::LightEmittingPattern) -> JoyConResult<SubCommandReply<[u8; 362]>> {
+    fn set_home_light(
+        &mut self,
+        pattern: &home_button::LightEmittingPattern,
+    ) -> JoyConResult<SubCommandReply<[u8; 362]>> {
         let arg: [u8; 25] = pattern.clone().into();
         self.send_sub_command(SubCommand::SetHOMELight, &arg)
     }

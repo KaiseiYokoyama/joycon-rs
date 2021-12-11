@@ -61,11 +61,9 @@ impl SimpleJoyConDriver {
                 let device = match joycon.lock() {
                     Ok(j) => j,
                     Err(e) => e.into_inner(),
-                }.device_type();
-                match device {
-                    JoyConDeviceType::ProCon => false,
-                    _ => true,
                 }
+                .device_type();
+                !matches!(device, JoyConDeviceType::ProCon)
             },
             global_packet_number: GlobalPacketNumber::default(),
         };
@@ -75,10 +73,7 @@ impl SimpleJoyConDriver {
                 Ok(d) => d,
                 Err(e) => e.into_inner(),
             };
-            match device.device_type() {
-                JoyConDeviceType::ProCon => false,
-                _ => true,
-            }
+            !matches!(device.device_type(), JoyConDeviceType::ProCon)
         };
 
         if check_reply {
@@ -99,7 +94,6 @@ impl SimpleJoyConDriver {
     }
 }
 
-
 impl JoyConDriver for SimpleJoyConDriver {
     fn valid_reply(&self) -> bool {
         self.valid_reply
@@ -111,15 +105,15 @@ impl JoyConDriver for SimpleJoyConDriver {
 
     fn write(&self, data: &[u8]) -> JoyConResult<usize> {
         let joycon = self.joycon();
-        Ok(joycon.write(data)?)
+        joycon.write(data)
     }
 
     fn read(&self, buf: &mut [u8]) -> JoyConResult<usize> {
-        Ok(self.joycon().read(buf)?)
+        self.joycon().read(buf)
     }
 
     fn read_timeout(&self, buf: &mut [u8], timeout: i32) -> JoyConResult<usize> {
-        Ok(self.joycon().read_timeout(buf,timeout)?)
+        self.joycon().read_timeout(buf, timeout)
     }
 
     fn global_packet_number(&self) -> u8 {

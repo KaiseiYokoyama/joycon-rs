@@ -48,7 +48,7 @@ impl Rumble {
     }
 
     /// Constructor of Rumble.
-/// If arguments not in line with constraints, args will be saturated.
+    /// If arguments not in line with constraints, args will be saturated.
     pub fn new(freq: f32, amp: f32) -> Self {
         let freq = if freq < 0.0 {
             0.0
@@ -78,14 +78,14 @@ impl Rumble {
     }
 
     /// Generates stopper of rumbling.
-///
-/// # Example
-/// ```ignore
-/// # use joycon_rs::prelude::*;
-/// # let mut rumbling_controller_driver: SimpleJoyConDriver;
-/// // Make JoyCon stop rambling.
-/// rumbling_controller_driver.rumble((Some(Rumble::stop()),Some(Rumble::stop()))).unwrap();
-/// ```
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use joycon_rs::prelude::*;
+    /// # let mut rumbling_controller_driver: SimpleJoyConDriver;
+    /// // Make JoyCon stop rambling.
+    /// rumbling_controller_driver.rumble((Some(Rumble::stop()),Some(Rumble::stop()))).unwrap();
+    /// ```
     pub fn stop() -> Self {
         Self {
             frequency: 0.0,
@@ -94,33 +94,37 @@ impl Rumble {
     }
 }
 
-impl Into<[u8; 4]> for Rumble {
-    fn into(self) -> [u8; 4] {
-        let encoded_hex_freq = f32::round(f32::log2(self.frequency / 10.0) * 32.0) as u8;
+impl From<Rumble> for [u8; 4] {
+    fn from(s: Rumble) -> [u8; 4] {
+        let encoded_hex_freq = f32::round(f32::log2(s.frequency / 10.0) * 32.0) as u8;
 
         let hf_freq: u16 = (encoded_hex_freq as u16).saturating_sub(0x60) * 4;
         let lf_freq: u8 = encoded_hex_freq.saturating_sub(0x41) + 1;
 
-        let encoded_hex_amp = if self.amplitude > 0.23 {
-            f32::round(f32::log2(self.amplitude * 8.7) * 32.0) as u8
-        } else if self.amplitude > 0.12 {
-            f32::round(f32::log2(self.amplitude * 17.0) * 16.0) as u8
+        let encoded_hex_amp = if s.amplitude > 0.23 {
+            f32::round(f32::log2(s.amplitude * 8.7) * 32.0) as u8
+        } else if s.amplitude > 0.12 {
+            f32::round(f32::log2(s.amplitude * 17.0) * 16.0) as u8
         } else {
-            f32::round(((f32::log2(self.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * self.amplitude)) as u8
+            f32::round(((f32::log2(s.amplitude) * 32.0) - 96.0) / (4.0 - 2.0 * s.amplitude)) as u8
         };
 
         let hf_amp: u16 = {
             let hf_amp: u16 = encoded_hex_amp as u16 * 2;
             if hf_amp > 0x01FC {
                 0x01FC
-            } else { hf_amp }
+            } else {
+                hf_amp
+            }
         }; // encoded_hex_amp<<1;
         let lf_amp: u8 = {
             let lf_amp = encoded_hex_amp / 2 + 64;
             if lf_amp > 0x7F {
                 0x7F
-            } else { lf_amp }
-        };      // (encoded_hex_amp>>1)+0x40;
+            } else {
+                lf_amp
+            }
+        }; // (encoded_hex_amp>>1)+0x40;
 
         let mut buf = [0u8; 4];
 
