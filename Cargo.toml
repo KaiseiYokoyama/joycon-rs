@@ -9,7 +9,11 @@ readme = "README.md"
 categories = ["game-development", "hardware-support"]
 keywords = ["nintendo_switch", "joycon", "gamedev", "hid", "bluetooth"]
 license = "Apache-2.0"
-exclude = ["/images/*"]
+exclude = [
+    "/images/*",
+    "/.github/*",
+    "/.idea/*",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
